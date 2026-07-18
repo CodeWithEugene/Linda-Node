@@ -1,0 +1,16 @@
+# Claude Flow session data
+.claude-flow/
+
+# Environment secrets
+.env
+.env.local
+
+# Local data samples
+data/
+
+# Dependencies & build output
+node_modules/
+__pycache__/
+*.pyc
+.next/
+dist/
