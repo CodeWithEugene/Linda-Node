@@ -32,7 +32,9 @@ An autonomous, multi-agent AI platform connecting ICPAC's ECMWF SEAS51 threshold
    - [7.7 Backend API Endpoints](#77-backend-api-endpoints)
    - [7.8 The Command Center Dashboard & Mini App](#78-the-command-center-dashboard--mini-app)
    - [7.9 Proof of Risk Dossier Generation](#79-proof-of-risk-dossier-generation)
-   - [7.10 Deployment](#710-deployment)
+   - [7.10 SMS & USSD Channel (Africa's Talking)](#710-sms--ussd-channel-africas-talking)
+   - [7.11 PWA & Android APK Packaging (Offline Functionality)](#711-pwa--android-apk-packaging-offline-functionality)
+   - [7.12 Deployment](#712-deployment)
 8. [System Resiliency & Security Safeguards](#8-system-resiliency--security-safeguards)
 9. [Application Walkthrough (User Journeys)](#9-application-walkthrough-user-journeys)
 10. [Development Status, Build Plan & Milestones](#10-development-status-build-plan--milestones)
@@ -120,15 +122,15 @@ While ICPAC's Multi-Hazard Triggers and Thresholds System generates world-class 
 
 ### Solution Details (Max 250 words — submission-ready)
 
-Linda Node operates on a scalable, cloud-native architecture: a **Next.js / React / TypeScript** frontend alongside a highly concurrent **Python (FastAPI)** backend. State management and geospatial indexing are handled via **Supabase (PostgreSQL + PostGIS)**. Designed for interoperability with ICPAC's [Husika](https://husika.icpac.net/) last-mile communication platform, the system processes incoming Telegram updates via asynchronous webhooks.
+Linda Node runs on a scalable, cloud-native architecture: a **Next.js / React / TypeScript** frontend delivered three ways — **web dashboard, installable offline-capable PWA, and Android APK** (via Capacitor) — alongside a highly concurrent **Python (FastAPI)** backend, with **Supabase (PostgreSQL + PostGIS)** handling state and geospatial indexing. The system consumes ICPAC's live Thresholds & Triggers API and is designed for interoperability with ICPAC's [Husika](https://husika.icpac.net/) platform.
 
 The core innovation is a **Proactive Multi-Agent AI System** built on a current-generation frontier LLM (Google Gemini 2.x):
 
 - **The Predictive Monitor Agent** ingests trigger outputs from ICPAC's threshold pipeline (SEAS51 ensemble forecasts and CHIRPS observations processed to SPI, with quantile-based threshold exceedance probabilities). When a forecast probability exceeds a predefined trigger, it flags the geospatial sub-county.
 - **The RAG Context Agent** retrieves historical, agricultural, and indigenous context for the flagged region using Retrieval-Augmented Generation over ICPAC bulletins and community reports.
-- **The Action Router Agent** synthesizes this data into localized impact warnings, pushing rich-text alerts and an interactive map **Telegram Mini App** directly to users.
+- **The Action Router Agent** synthesizes localized impact warnings and dispatches them per user's channel: rich alerts and an interactive map **Telegram Mini App**, plus **SMS broadcasts and an interactive USSD menu via Africa's Talking gateways** — so feature phones and data-dark areas receive the same warnings.
 
-In parallel, the **Anticipatory Financing Module** activates when severe thresholds are met, generating a "Proof of Risk" PDF dossier — a standardized evidence package combining ICPAC trigger data, community consensus, and AI analysis. Local cooperatives and NGOs use this dossier to support the release of pre-arranged micro-loans or relief funds **days before** a climate shock occurs — with humans, not AI, making the final authorization. This bridges the final gap between early warning and early action.
+In parallel, the **Anticipatory Financing Module** activates when severe thresholds are met, generating a "Proof of Risk" PDF dossier — a standardized evidence package combining ICPAC trigger data, community consensus, and AI analysis. Local cooperatives and NGOs use this dossier to support the release of pre-arranged micro-loans or relief funds **days before** a climate shock occurs — with humans, not AI, making the final authorization.
 
 ---
 
@@ -137,8 +139,15 @@ In parallel, the **Anticipatory Financing Module** activates when severe thresho
 ### 4.1 Proactive Multi-Agent Architecture
 Linda Node abandons the traditional "wait-for-a-prompt" chatbot model. It operates **asynchronously**: actively monitoring ICPAC data streams and pushing alerts out *before* the community asks, using three distinct LLM-powered agents to monitor, contextualize, and communicate risk dynamically based on the user's specific livelihood profile (e.g., maize farmer vs. pastoralist vs. county official). Full agent specification in [Section 7.5](#75-the-multi-agent-system).
 
-### 4.2 Telegram Bot & Mini App Integration
-To solve the last-mile UI challenge, Linda Node uses the [Telegram Bot API](https://core.telegram.org/bots/api). For local government officials and community leaders, a [Telegram Mini App](https://core.telegram.org/bots/webapps) opens the Next.js interactive dashboard **directly inside the chat client**. Officials receive the "Proof of Risk" alert in chat, tap a button, and immediately view live ICPAC data overlays on a mobile-first interface without leaving the app. Telegram is chosen deliberately: it is lightweight on degraded networks, supports rich media + inline keyboards + web apps in one client, and is widely used across the region.
+### 4.2 True Multi-Channel Delivery: Telegram + SMS + USSD + Web/PWA/APK
+Linda Node meets every user on the device they actually own:
+
+- **Telegram Bot & Mini App** ([Bot API](https://core.telegram.org/bots/api) / [Mini Apps](https://core.telegram.org/bots/webapps)) — the rich-media channel: inline keyboards, photos, and the Next.js dashboard opening **directly inside the chat client**. Officials receive the "Proof of Risk" alert in chat, tap a button, and view live ICPAC overlays without leaving the app.
+- **SMS via [Africa's Talking](https://africastalking.com/sms)** — outbound alert broadcasts and inbound keyword reporting (`REPORT pasture failing`) for any GSM phone, no data required.
+- **USSD via [Africa's Talking](https://africastalking.com/ussd)** — an interactive `*384#`-style session menu (check my area's outlook / register / report conditions / change language) that works on **feature phones with zero internet** — the reality for a large share of pastoralist households.
+- **Web dashboard, installable PWA, and Android APK** (same Next.js codebase via [Capacitor](https://capacitorjs.com/)) — the PWA/APK cache the latest trigger states and advisories with a service worker, so previously synced warnings remain **readable fully offline** in the field.
+
+One backend, one alert pipeline, four delivery surfaces — coverage from smartphone to feature phone to no-signal.
 
 ### 4.3 Native Integration with ICPAC's Thresholds & Triggers Pipeline
 Unlike generic weather apps relying on commercial APIs, Linda Node's backend consumes the outputs of ICPAC's own open-source drought trigger pipeline — the exact scripts, notebooks, and data formats are documented in [Section 6](#6-icpac-data-infrastructure-what-we-integrate-with). Linda Node is the missing **last-mile delivery layer** for ICPAC's existing geospatial data infrastructure.
@@ -180,20 +189,22 @@ Communities are active data nodes, not passive recipients. Users send unstructur
 │                                                                        │
 │  Financing Module ──► Proof of Risk PDF dossiers (human-authorized)    │
 │  Storage: Supabase (PostgreSQL + PostGIS)  ·  pgvector for RAG         │
-└─────────┬────────────────────────────────────────┬─────────────────────┘
-          │ Telegram Bot API (async webhooks)      │ REST / WebSocket
-          ▼                                        ▼
-┌───────────────────────────┐        ┌─────────────────────────────────┐
-│  COMMUNITY INTERFACE      │        │  COMMAND CENTER (Next.js 14+)   │
-│  Telegram Bot             │        │  • Live Watch map (MapLibre/    │
-│  • Onboarding & profiling │        │    Mapbox GL)                   │
-│  • Proactive alerts       │        │  • Trigger polygons heatmap     │
-│  • Conversational Q&A     │        │  • Community Sentinel layer     │
-│  • Hazard reporting       │        │  • Financing Triggers page      │
-│  (Swahili / English)      │        │  • 1-click Proof of Risk        │
-│                           │        │  Served standalone AND as       │
-│                           │        │  Telegram Mini App              │
-└───────────────────────────┘        └─────────────────────────────────┘
+└───┬──────────────────────┬──────────────────────────┬──────────────────┘
+    │ Telegram Bot API     │ Africa's Talking          │ REST / WebSocket
+    │ (async webhooks)     │ SMS + USSD webhooks       │
+    ▼                      ▼                           ▼
+┌──────────────────┐ ┌──────────────────┐ ┌─────────────────────────────┐
+│ TELEGRAM CHANNEL │ │ GSM CHANNEL      │ │ COMMAND CENTER (Next.js 14+)│
+│ • Onboarding &   │ │ (feature phones, │ │ • Live Watch map (MapLibre) │
+│   profiling      │ │  zero internet)  │ │ • Trigger polygons heatmap  │
+│ • Proactive rich │ │ • SMS alert      │ │ • Community Sentinel layer  │
+│   alerts         │ │   broadcasts     │ │ • Financing Triggers page   │
+│ • Grounded Q&A   │ │ • SMS keyword    │ │ • 1-click Proof of Risk     │
+│ • Photo/text     │ │   reporting      │ │ Delivered as: standalone    │
+│   hazard reports │ │ • USSD *384#     │ │ web app, Telegram Mini App, │
+│ (Swahili/English)│ │   session menu   │ │ offline-capable PWA, and    │
+└──────────────────┘ └──────────────────┘ │ Android APK (Capacitor)     │
+                                          └─────────────────────────────┘
 ```
 
 **Technology stack:**
@@ -206,6 +217,8 @@ Communities are active data nodes, not passive recipients. Users send unstructur
 | Database | [Supabase](https://supabase.com/) (PostgreSQL 15 + [PostGIS](https://postgis.net/) + [pgvector](https://github.com/pgvector/pgvector)) | Geospatial queries + embeddings + auth + realtime in one managed service |
 | LLM | [Google Gemini 2.x](https://ai.google.dev/) (function calling + vision) | Multilingual (Swahili/Amharic), multimodal report processing |
 | Bot framework | [aiogram 3](https://docs.aiogram.dev/) (or [python-telegram-bot](https://python-telegram-bot.org/)) | Async-native Telegram Bot API framework |
+| SMS & USSD | [Africa's Talking](https://africastalking.com/) ([SMS API](https://developers.africastalking.com/docs/sms/overview), [USSD API](https://developers.africastalking.com/docs/ussd/overview)) | GSM-channel alerts, keyword reporting, and interactive USSD menus for feature phones — with a free [sandbox + simulator](https://developers.africastalking.com/simulator) for development |
+| Mobile packaging | [Capacitor](https://capacitorjs.com/) + [next-pwa](https://github.com/shadowwalker/next-pwa) | Same Next.js codebase ships as installable offline-capable PWA and Android APK |
 | Climate data | [xarray](https://docs.xarray.dev/), [xclim](https://xclim.readthedocs.io/) / [climate_indices](https://github.com/monocongo/climate_indices), [geopandas](https://geopandas.org/), [rioxarray](https://corteva.github.io/rioxarray/) | NetCDF/Zarr processing, SPI computation, zonal statistics |
 | PDF | [WeasyPrint](https://weasyprint.org/) (HTML→PDF) | Templated Proof of Risk dossiers |
 | Deploy | Docker + [Railway](https://railway.app/) / [Fly.io](https://fly.io/) / [Render](https://render.com/) | Fast, cheap, public HTTPS for webhooks & Mini App |
@@ -299,6 +312,10 @@ Linda-Node/
 │   │   │   ├── handlers.py    # aiogram routers: /start, onboarding, Q&A, reports
 │   │   │   ├── keyboards.py   # inline keyboards & Mini App buttons
 │   │   │   └── i18n.py        # sw/en string tables
+│   │   ├── channels/
+│   │   │   ├── sms.py         # Africa's Talking SMS: outbound broadcasts + inbound webhook
+│   │   │   ├── ussd.py        # Africa's Talking USSD: session state machine (CON/END)
+│   │   │   └── dispatch.py    # channel-agnostic alert dispatcher (telegram|sms|ussd)
 │   │   ├── agents/
 │   │   │   ├── monitor.py     # Predictive Monitor Agent
 │   │   │   ├── context.py     # RAG Context Agent (pgvector retrieval)
@@ -357,6 +374,8 @@ ngrok http 8000   # then: POST https://api.telegram.org/bot<TOKEN>/setWebhook?ur
 | `GEMINI_API_KEY` | LLM calls | [Google AI Studio](https://aistudio.google.com/) |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | DB access | [Supabase dashboard](https://supabase.com/dashboard) → project settings |
 | `DATABASE_URL` | Direct asyncpg/PostGIS | Supabase → connection string |
+| `AT_USERNAME`, `AT_API_KEY` | Africa's Talking SMS/USSD (`sandbox` username in dev) | [Africa's Talking dashboard](https://account.africastalking.com/) |
+| `AT_SHORTCODE`, `AT_USSD_CODE` | Sender ID / service code | Africa's Talking (sandbox codes free) |
 | `CDSAPI_URL`, `CDSAPI_KEY` | SEAS51 download (optional if using sample data) | [CDS API how-to](https://cds.climate.copernicus.eu/how-to-api) |
 | `MAPTILER_KEY` or `MAPBOX_TOKEN` | Basemap tiles | [MapTiler](https://www.maptiler.com/) / [Mapbox](https://mapbox.com/) |
 | `PUBLIC_BASE_URL` | Webhook + Mini App URL | your deployment URL |
@@ -398,12 +417,16 @@ create table trigger_states (
 -- Users: Telegram-registered community members & officials
 create table users (
   id             bigserial primary key,
-  telegram_id    bigint unique not null,
+  telegram_id    bigint unique,                      -- null for SMS/USSD-only users
+  phone_number   text unique,                        -- E.164; null for Telegram-only users
+  channel        text not null default 'telegram'
+                 check (channel in ('telegram','sms','ussd')),  -- preferred alert channel
   role           text not null check (role in ('farmer','pastoralist','official','ngo')),
   language       text not null default 'en' check (language in ('en','sw')),
-  location       geometry(Point, 4326),
-  admin_unit_id  bigint references admin_units(id),  -- resolved via ST_Contains
-  created_at     timestamptz default now()
+  location       geometry(Point, 4326),              -- GPS pin (Telegram) or ward centroid (USSD)
+  admin_unit_id  bigint references admin_units(id),  -- resolved via ST_Contains or USSD menu pick
+  created_at     timestamptz default now(),
+  check (telegram_id is not null or phone_number is not null)
 );
 
 -- Community reports: the "Community Sentinel" layer
@@ -539,6 +562,9 @@ All prompts live in `backend/app/agents/prompts.py`, versioned as constants. Use
 | Method & path | Purpose | Consumer |
 |---|---|---|
 | `POST /telegram/webhook` | All bot updates (aiogram dispatcher) | Telegram |
+| `POST /channels/sms/webhook` | Inbound SMS (keyword reports, STOP/START) | Africa's Talking |
+| `POST /channels/ussd/webhook` | USSD session steps (form-encoded; respond `CON`/`END` plain text) | Africa's Talking |
+| `POST /channels/sms/delivery` | SMS delivery reports → mark `alerts.delivered` | Africa's Talking |
 | `GET /api/triggers?season=&level=` | GeoJSON FeatureCollection of admin polygons + trigger properties | Dashboard map |
 | `GET /api/reports?unit_id=&since=` | GeoJSON of verified community reports | Dashboard map |
 | `GET /api/units/{id}/summary` | Trigger history + report stats + latest context for one unit | Unit drill-down |
@@ -576,7 +602,53 @@ A dossier is a **decision-support evidence package, not a payment instruction**.
 7. **Authorization block:** *"This dossier supports — but does not constitute — a financing decision. Final authorization: ____________ (name, organization, signature)."*
 8. **Footer:** links to [Thresholds Watch](https://eatriggersthresholds.icpac.net/), the [IGAD AA Roadmap](https://www.icpac.net/documents/894/IGAD_RegionalAARoadmap-Revised.pdf), and this repository.
 
-### 7.10 Deployment
+### 7.10 SMS & USSD Channel (Africa's Talking)
+
+The GSM channel makes Linda Node work on **any phone, with zero internet** — the decisive reach argument for pastoralist households. Built on [Africa's Talking](https://africastalking.com/) ([SMS docs](https://developers.africastalking.com/docs/sms/overview), [USSD docs](https://developers.africastalking.com/docs/ussd/overview)); develop against the free **sandbox + [simulator](https://developers.africastalking.com/simulator)**, demo on sandbox or a live shortcode if provisioning time allows.
+
+**Environment variables:** `AT_USERNAME` (use `sandbox` in dev), `AT_API_KEY`, `AT_SHORTCODE`, `AT_USSD_CODE`.
+
+**Outbound SMS alerts** (`channels/sms.py` + `channels/dispatch.py`):
+- The Action Router produces the alert once; `dispatch.py` routes per `users.channel`. For SMS users the LLM is instructed to compress to **≤ 160 GSM-7 chars**, action-first: `LINDA: Ukame mkali unatarajiwa Turkana Okt-Des (ICPAC). Uza mifugo ya ziada sasa; hifadhi malisho. Jibu REPORT <hali> kutuma taarifa.`
+- Delivery reports hit `POST /channels/sms/delivery` → set `alerts.delivered`.
+
+**Inbound SMS keywords** (webhook `POST /channels/sms/webhook`):
+- `REPORT <free text>` → same Gemini classification pipeline as Telegram reports; location = registered ward centroid.
+- `STATUS` → current trigger state for the user's unit, compressed.
+- `STOP` / `START` → opt-out/in (required for responsible messaging).
+
+**USSD session menu** (`channels/ussd.py` — a small state machine keyed on `sessionId`; AT posts `sessionId, serviceCode, phoneNumber, text` after each step; respond with plain text starting `CON` to continue or `END` to finish):
+
+```
+*384*XXX#
+CON Karibu Linda Node / Welcome
+ 1. Hali ya hewa eneo langu (My area outlook)
+ 2. Jisajili (Register)
+ 3. Ripoti hali (Report conditions)
+ 4. Badilisha lugha (Language)
+
+[2] → CON Chagua kaunti / county list (paged)   → CON role: 1.Mkulima 2.Mfugaji
+     → END Umesajiliwa Turkana. Utapokea tahadhari kwa SMS.
+[1] → END Turkana: Uwezekano mkubwa (80%) wa mvua chache Okt-Des (ICPAC).
+     Hatua: uza mifugo ya ziada, hifadhi malisho.
+[3] → CON Eleza hali (1.Malisho 2.Maji 3.Mazao 4.Mifugo) → END Asante. Ripoti imepokelewa.
+```
+
+- USSD registration stores `phone_number` + county pick (ward centroid as location, `channel='sms'` so subsequent alerts arrive by SMS — USSD is session-only, it cannot receive pushes).
+- Keep every USSD screen ≤ 160 chars; no LLM calls inside the session (latency limit ~8s) — serve from pre-computed `trigger_states` + cached advice strings.
+
+### 7.11 PWA & Android APK Packaging (Offline Functionality)
+
+One Next.js codebase ships four ways — satisfying the hackathon's "web link **or APK**" requirement with both:
+
+1. **Web dashboard** — standard deployment (Vercel or same host as API).
+2. **Telegram Mini App** — same app detected via `@twa-dev/sdk` ([§7.8](#78-the-command-center-dashboard--mini-app)).
+3. **Installable PWA** — via [next-pwa](https://github.com/shadowwalker/next-pwa): web manifest + service worker with `stale-while-revalidate` caching of `GET /api/triggers`, `GET /api/units/{id}/summary`, advisory text, and map tiles for the user's region. Result: **the last-synced trigger map and advice remain fully readable offline** in the field; an offline banner shows the data's sync timestamp (honesty rule: never present cached data as live).
+4. **Android APK** — [Capacitor](https://capacitorjs.com/) wraps the same build (`npx cap add android && npx cap sync && gradle assembleRelease`). The APK bundles the service-worker cache plus a local fallback page, and registers for background sync to refresh trigger states when connectivity returns.
+
+Offline scope is deliberately read-only at MVP: viewing warnings/maps works offline; submitting reports queues locally (IndexedDB) and syncs when back online.
+
+### 7.12 Deployment
 
 - **Backend:** Docker image → Railway/Fly/Render. Needs public HTTPS for the Telegram webhook. Set webhook on deploy: `setWebhook?url=$PUBLIC_BASE_URL/telegram/webhook&secret_token=...` (verify the secret header in the handler).
 - **Frontend:** Vercel (or same host). `NEXT_PUBLIC_API_URL` → backend.
@@ -605,7 +677,7 @@ Failing any condition blocks issuance and the UI explains which condition failed
 
 **Auditability:** every alert, report, and dossier is a database row with timestamps and actor IDs — an NGO can reconstruct exactly why any alert or dossier was produced.
 
-**Low-connectivity resilience (roadmap):** Telegram is deliberately lightweight on degraded networks; a dual-layer fallback — SMS/USSD gateways (e.g., [Africa's Talking](https://africastalking.com/)) for text-only GSM channels — is designed and scheduled post-hackathon ([Section 14](#14-future-roadmap-post-hackathon)).
+**Low-connectivity resilience (built-in):** Linda Node runs a **dual-layer communications architecture**. The rich-media layer (Telegram + Mini App) is itself lightweight on degraded networks; beneath it, the GSM layer via [Africa's Talking](https://africastalking.com/) delivers SMS alert broadcasts and an interactive USSD menu that work on feature phones with **zero internet** ([§7.10](#710-sms--ussd-channel-africas-talking)). On the smartphone side, the PWA/APK service worker keeps the last-synced trigger map and advisories readable fully offline, with queued report sync on reconnect ([§7.11](#711-pwa--android-apk-packaging-offline-functionality)). If cellular data collapses during a severe-weather event, warnings still flow over plain GSM.
 
 ---
 
@@ -617,12 +689,18 @@ Failing any condition blocks issuance and the UI explains which condition failed
 3. **Q&A:** asks *"Je, ni salama kupanda mahindi wiki ijayo?"* → grounded answer for her exact pin, citing the ICPAC forecast issue date.
 4. **Reporting:** sends a photo of failing pasture → classified `pasture / severity 4` → appears on the Community Sentinel layer within seconds.
 
-### Journey 2 — David, county drought officer (official)
+### Journey 2 — Ekiru, herder with a feature phone, no internet (GSM channel)
+1. **Registration:** at a community meeting, dials `*384*XXX#` on his 2G feature phone → picks Kiswahili → county: Turkana → role: Mfugaji (herder). No smartphone, no app, no data bundle needed.
+2. **Proactive alert:** weeks later receives the 160-character SMS: *"LINDA: Ukame mkali unatarajiwa Turkana Okt-Des (ICPAC). Uza mifugo ya ziada sasa; hifadhi malisho."*
+3. **Check-in:** dials the USSD code, presses 1, and reads the current outlook for his county on-screen — even with zero airtime for calls.
+4. **Reporting:** replies `REPORT malisho yameisha` (pasture is finished) → classified and pinned to the Community Sentinel layer like any Telegram report — same triangulation weight, same dignity.
+
+### Journey 3 — David, county drought officer (official)
 1. Receives an escalation alert: Turkana entered **severe**. Taps `[Open Hazard Map]` → Mini App opens inside Telegram: red polygon, 14 community reports clustered in two wards.
 2. Opens **Financing Triggers**: Turkana row shows traffic-light red, triangulation ✅✅✅. Clicks **Generate Action Brief & Risk Certificate**.
 3. Downloads the PDF dossier and tables it with the county steering group and the NGO cash-transfer partner — **days before the failed season materializes**, converting a forecast into a funded response.
 
-### Journey 3 — NGO program manager (anticipatory action financing)
+### Journey 4 — NGO program manager (anticipatory action financing)
 1. Monitors the standalone dashboard across three countries. Sees which triggered units also have community-consensus confirmation (double evidence).
 2. Uses dossiers as standardized annexes for activating pre-arranged anticipatory funds — the exact mechanism the [IGAD AA Roadmap](https://www.icpac.net/documents/894/IGAD_RegionalAARoadmap-Revised.pdf) and [Anticipation Hub](https://www.anticipation-hub.org/) frameworks call for.
 
@@ -636,11 +714,12 @@ Failing any condition blocks issuance and the UI explains which condition failed
 |---|---|---|---|
 | **1. Data foundation** | 1–3 | Boundaries + trigger ingestion (Path A) into Supabase/PostGIS; seed script | `GET /api/triggers` returns real GeoJSON; spatial pin→unit query works |
 | **2. Telegram bot MVP** | 3–8 | Onboarding, proactive alerts, grounded Q&A, report intake (en+sw) | A judge can register, receive an alert, ask a question, file a report — on their own phone |
-| **3. Dashboard + Mini App** | 8–11 | Live Watch map + Financing page; Mini App registration | Map renders trigger choropleth + report pins on mobile inside Telegram |
-| **4. Proof of Risk** | 10–12 | Triangulation engine + PDF dossier | Button produces the full dossier; failing triangulation blocks with explanation |
-| **5. Ship** | 11–13 | Deploy, seed demo data, record ≤5-min video, finalize README, submit | Submission complete on Devpost before July 31, 5pm EAT |
+| **3. SMS & USSD channel** | 6–9 | Africa's Talking integration: SMS broadcasts, keyword reports, USSD menu ([§7.10](#710-sms--ussd-channel-africas-talking)) — parallel track, team's core expertise | Register + receive alert + file report entirely from the AT simulator (or a feature phone on sandbox) |
+| **4. Dashboard + Mini App + PWA/APK** | 8–11 | Live Watch map + Financing page; Mini App registration; next-pwa offline caching; Capacitor APK build ([§7.11](#711-pwa--android-apk-packaging-offline-functionality)) | Map renders on mobile inside Telegram; airplane-mode phone still shows last-synced triggers; APK installs and runs |
+| **5. Proof of Risk** | 10–12 | Triangulation engine + PDF dossier | Button produces the full dossier; failing triangulation blocks with explanation |
+| **6. Ship** | 11–13 | Deploy, seed demo data, record ≤5-min video, finalize README, submit | Submission complete on Devpost before July 31, 5pm EAT |
 
-**Deliberately descoped to the roadmap** (do *not* build these for the hackathon): USSD/SMS gateways, voice-note processing, Bluetooth mesh, Amharic and further languages, live SEAS51 downloads in production, the agent-activity feed, Celery/Redis (a scheduled asyncio task suffices at MVP scale). Depth on a working slice beats breadth of promises.
+**Deliberately descoped to the roadmap** (do *not* build these for the hackathon): voice-note processing, Bluetooth mesh, Amharic and further languages, live SEAS51 downloads in production, the agent-activity feed, Celery/Redis (a scheduled asyncio task suffices at MVP scale), live USSD shortcode provisioning if telco lead times exceed the deadline (sandbox + simulator demo is acceptable and honest). Depth on a working slice beats breadth of promises.
 
 ---
 
@@ -683,6 +762,7 @@ Failing any condition blocks issuance and the UI explains which condition failed
 
 ### Problem Value & Impact (25%)
 - Attacks the economic barrier to anticipatory action — warnings without capital don't change outcomes ([Section 11](#11-impact-who-benefits-and-how-we-measure-it)).
+- **Reach that matches regional reality:** USSD/SMS coverage means the poorest household with a 2G feature phone gets the same warning as a smartphone user — plus offline PWA/APK access where data networks degrade during crises.
 - Institutionally aligned: [IGAD AA Roadmap](https://www.icpac.net/documents/894/IGAD_RegionalAARoadmap-Revised.pdf), [Husika's](https://husika.icpac.net/) last-mile mandate, and the live [IMPAACT initiative](https://www.actionagainsthunger.org/press-releases/action-against-hunger-and-the-igad-climate-prediction-and-applications-centre-icpac-launch-landmark-echo-funded-initiative-to-build-anticipatory-action-systems-across-the-greater-horn-of-africa/) region.
 - Impact is instrumented, not asserted: the measurement tables ship with the MVP.
 
@@ -700,15 +780,16 @@ Failing any condition blocks issuance and the UI explains which condition failed
 | 0:00–0:30 | The gap: ICPAC's [Thresholds Watch](https://eatriggersthresholds.icpac.net/) on screen → *"world-class triggers; now watch them reach a pastoralist's phone."* |
 | 0:30–1:00 | Architecture slide (the diagram in [Section 5](#5-system-architecture)), 30 seconds max |
 | 1:00–2:15 | **Phone screen recording:** onboarding → proactive Swahili alert arrives → grounded Q&A on the user's pin |
-| 2:15–3:00 | Community report with photo → pin appears on the Live Watch map |
-| 3:00–4:00 | Official flow: Mini App opens inside Telegram → Financing page → triangulation passes → **PDF dossier generated on camera** |
-| 4:00–4:30 | Show triangulation *failing* for a non-consensus county — the safety story |
-| 4:30–5:00 | Impact + roadmap (Husika module), honest status statement, team |
+| 2:15–2:45 | Community report with photo → pin appears on the Live Watch map |
+| 2:45–3:30 | **The reach story:** USSD `*384#` registration + SMS alert arriving on a feature phone (AT simulator or real device) → then a smartphone in **airplane mode** still showing the last-synced trigger map (PWA offline) |
+| 3:30–4:15 | Official flow: Mini App opens inside Telegram → Financing page → triangulation passes → **PDF dossier generated on camera** |
+| 4:15–4:40 | Show triangulation *failing* for a non-consensus county — the safety story |
+| 4:40–5:00 | Impact + roadmap (Husika module), honest status statement, team |
 
 **Submission checklist (Devpost, before July 31 2026, 5:00pm EAT):**
 - [ ] Project Overview ≤ 250 words (copy from [Section 2](#2-the-problem))
 - [ ] Solution Details ≤ 250 words (copy from [Section 3](#3-the-solution-linda-node))
-- [ ] Working prototype URL (dashboard) + bot handle (@…bot)
+- [ ] Working prototype URL (dashboard/PWA) + bot handle (@…bot) + APK download link + USSD/SMS demo access (sandbox instructions)
 - [ ] Demo video ≤ 5 min uploaded (YouTube unlisted) and linked
 - [ ] Public GitHub repo (this one) with reproducible setup ([7.2](#72-environment--setup))
 - [ ] Tech stack listed on the form (from [Section 5](#5-system-architecture))
@@ -719,7 +800,7 @@ Failing any condition blocks issuance and the UI explains which condition failed
 
 ## 14. Future Roadmap (Post-Hackathon)
 
-- **SMS & USSD fallback:** dual-layer GSM communications (e.g., [Africa's Talking](https://africastalking.com/) gateways) for network-degraded environments.
+- **Live USSD shortcode & premium SMS provisioning:** graduating from Africa's Talking sandbox to production telco shortcodes across all IGAD countries (dedicated codes, delivery SLAs, cost optimization at scale).
 - **Voice-to-text for indigenous languages:** processing voice notes in localized dialects underserved by standard text models.
 - **Amharic, Somali, Oromo language packs** beyond the launch Swahili/English.
 - **Offline mesh networking:** relaying hazard warnings via Bluetooth mesh where cellular infrastructure collapses during floods.
@@ -769,7 +850,8 @@ Failing any condition blocks issuance and the UI explains which condition failed
 - [FastAPI](https://fastapi.tiangolo.com/) · [Next.js](https://nextjs.org/) · [Supabase](https://supabase.com/) · [PostGIS](https://postgis.net/) · [pgvector](https://github.com/pgvector/pgvector)
 - [MapLibre GL JS](https://maplibre.org/) · [Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/) · [MapTiler](https://www.maptiler.com/)
 - [WeasyPrint](https://weasyprint.org/) · [Railway](https://railway.app/) · [Fly.io](https://fly.io/) · [Render](https://render.com/) · [Vercel](https://vercel.com/)
-- [Africa's Talking (SMS/USSD, roadmap)](https://africastalking.com/)
+- [Africa's Talking](https://africastalking.com/) — [SMS API](https://developers.africastalking.com/docs/sms/overview) · [USSD API](https://developers.africastalking.com/docs/ussd/overview) · [sandbox simulator](https://developers.africastalking.com/simulator)
+- [Capacitor (APK packaging)](https://capacitorjs.com/) · [next-pwa (offline PWA)](https://github.com/shadowwalker/next-pwa)
 
 ---
 
