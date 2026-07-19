@@ -236,7 +236,23 @@ Actual contents (verified against the repository):
 
 **How Linda Node consumes it:** our ingestion worker ([Section 7.4](#74-data-ingestion-pipeline)) runs/consumes this pipeline's outputs — per-admin-unit threshold exceedance probabilities — and loads them into PostGIS, where the Predictive Monitor Agent evaluates them against trigger levels.
 
-### 6.2 Upstream raw data sources
+### 6.2 Discovered live API surface on Thresholds Watch (verified July 18, 2026)
+
+The operational [Thresholds & Triggers Watch](https://eatriggersthresholds.icpac.net/) platform exposes a **publicly readable JSON API and vector-tile server** — meaning Linda Node can consume ICPAC's *live operational data*, not synthetic samples:
+
+| Endpoint | Returns (verified) |
+|---|---|
+| `GET /api/datasets/` | Registry root: links to categories, sources, seasons, indicators |
+| `GET /api/datasets/indicators/` | 6 indicators incl. **SPI-3 (CHIRPS)** with `supports_forecast: true`, SPI-3 (ERA5), SPEI-3 (ERA5) |
+| `GET /api/datasets/sources/` | CHIRPS (0.05°, monthly), ERA5 (0.25°, daily), GHACOF (seasonal) |
+| `GET /api/datasets/seasons/` | MAM, JJAS, **OND (release months: July–September — i.e., live during this hackathon)** |
+| `GET /api/datasets/temp-forecast/metadata/` | Live forecast init dates (latest: 2026-06-28 at time of verification) |
+| `GET /tileserv/index.json` | [pg_tileserv](https://github.com/CrunchyData/pg_tileserv) layer list: **GADM 4.1 admin boundaries levels 0–4**, IGAD clusters, child-vulnerability exposure scores, flood grids — consumable as vector tiles (MVT) |
+| `/api/climate/area-analysis/popup_data/`, `/climate/api/pixel_timeseries/`, `/api/skill`, `/api/mapserver/proxy/` | Per-area values / time series / forecast skill (parameters to be reverse-engineered from the app during Phase 1) |
+
+**Implications for the build:** boundaries can come straight from ICPAC's own tile server (`boundary.gadm_41_admin_level_*`); trigger/indicator values from the datasets API; and the demo can truthfully say *"this is ICPAC's live operational data"* — while keeping the offline seeded dataset as a fallback if endpoints change or rate-limit.
+
+### 6.3 Upstream raw data sources
 
 | Source | What | Access |
 |---|---|---|
@@ -245,7 +261,7 @@ Actual contents (verified against the repository):
 | **Admin boundaries (GHA)** | Sub-national polygons for trigger zones | [ICPAC GeoPortal](https://geoportal.icpac.net/) · [geoBoundaries](https://www.geoboundaries.org/) · [GADM](https://gadm.org/) |
 | **SPI methodology** | Standardized Precipitation Index (WMO standard drought index) | [WMO SPI User Guide](https://library.wmo.int/idurl/4/39629) · computed via [climate_indices](https://github.com/monocongo/climate_indices) or [xclim](https://xclim.readthedocs.io/) |
 
-### 6.3 ICPAC operational platforms we align with
+### 6.4 ICPAC operational platforms we align with
 
 | Platform | URL | Relationship to Linda Node |
 |---|---|---|
@@ -453,7 +469,12 @@ limit 1;
 
 ### 7.4 Data Ingestion Pipeline
 
-**Goal:** trigger-state rows in PostGIS from ICPAC's pipeline outputs. Two supported paths — build Path A first (deterministic, demo-safe), add Path B if time allows.
+**Goal:** trigger-state rows in PostGIS from ICPAC's pipeline outputs. Three supported paths — **build Path 0 first** (live operational data, verified available in [§6.2](#62-discovered-live-api-surface-on-thresholds-watch-verified-july-18-2026)), keep Path A as the demo-safe fallback, add Path B only if time allows.
+
+**Path 0 — consume the live Thresholds Watch API (preferred):**
+1. Pull boundaries as vector tiles / from the `boundary.gadm_41_admin_level_*` layers on `https://eatriggersthresholds.icpac.net/tileserv/` (or download GADM 4.1 directly and match IDs).
+2. Poll `GET /api/datasets/temp-forecast/metadata/` for the latest init date; fetch per-area indicator values via the `area-analysis`/`pixel_timeseries` endpoints (reverse-engineer exact params from the app's network calls during Phase 1).
+3. Map returned SPI-3/exceedance values to `trigger_states` rows exactly as in Path A step 2. Cache all responses; if any endpoint is unavailable or rate-limited, fall back to Path A seeded data automatically and label the data source in the UI honestly.
 
 **Path A — consume pipeline outputs (MVP default):**
 1. Obtain sample outputs of [ibf-thresholds-triggers](https://github.com/icpac-igad/ibf-thresholds-triggers): the CSV exceedance-probability files produced by `03_prob_csv_q.py` and/or the NetCDF SPI fields from the `01-input-spi-seas51` notebook. If live samples aren't published, generate them by running the notebooks on a small SEAS51 extract from the [CDS](https://cds.climate.copernicus.eu/datasets/seasonal-monthly-single-levels) (subset: Greater Horn of Africa bbox `[lat 15..-12, lon 21..52]`, 1 issue month, precipitation only) — or construct a clearly-labeled synthetic sample with realistic values for the demo.
