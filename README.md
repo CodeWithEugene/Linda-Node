@@ -1,3 +1,17 @@
+# Linda Protocol — TL;DR
+
+> **⚠️ Direction update (22 July 2026):** the project has pivoted from "Linda Node" (below) to **Linda Protocol**. Build spec: [`what-to-build.md`](what-to-build.md) · evidence base: [`research.md`](research.md). The rest of this README describes the old concept and is pending rewrite.
+
+**The problem:** Forecasts and alerts exist across the Greater Horn of Africa, but there is no digital system for what happens *after* a trigger fires — deciding which pre-agreed action to start, who approves it, and proving why — so activations are slow, undocumented, and IGAD literally hired a consultant for six months just to count them.
+
+**What's been done:** ICPAC already owns the science and the delivery — Thresholds & Triggers monitors indicators and fires triggers (but its only actions are an email and a dashboard update), and Husika delivers alerts via SMS/USSD/apps/web — so warning generation and last-mile communication are solved, while the decision layer between them is not.
+
+**Our solution (Linda Protocol):** An auditable activation workspace that ingests ICPAC's live trigger and forecast APIs with full provenance, runs a transparent deterministic policy (Ready–Set–Go stages, stop-triggers, cost-loss trace), walks pre-agreed action cards through a readiness board and three-role co-signing (EWS specialist, county DRM officer, NGO finance lead), and outputs an immutable signed decision packet plus CAP 1.2 alerts and a Husika-schema-validated handoff.
+
+**Our unique edge:** We are demonstrably the "missing third action type" on ICPAC's own live pipeline — built on their real APIs, validating against Husika's published schema, exposing our own consumable API back to them, with AI constrained to explaining evidence rather than making decisions — so the judges (mostly ICPAC and Husika's own developers) see their stack extended with the governance layer their own docs admit is missing, not duplicated.
+
+---
+
 <div align="center">
 
 # Linda Node: The Last-Mile Anticipatory Action Engine
