@@ -24,6 +24,7 @@ const AdminPage = lazy(() => import('./pages').then((module) => ({ default: modu
 const AuditPage = lazy(() => import('./pages').then((module) => ({ default: module.AuditPage })))
 const CaseDetailPage = lazy(() => import('./pages').then((module) => ({ default: module.CaseDetailPage })))
 const CasesPage = lazy(() => import('./pages').then((module) => ({ default: module.CasesPage })))
+const DeveloperDocsPage = lazy(() => import('./pages').then((module) => ({ default: module.DeveloperDocsPage })))
 const LibraryPage = lazy(() => import('./pages').then((module) => ({ default: module.LibraryPage })))
 const InboxPage = lazy(() => import('./pages').then((module) => ({ default: module.InboxPage })))
 const IntegrationsPage = lazy(() => import('./pages').then((module) => ({ default: module.IntegrationsPage })))
@@ -67,13 +68,14 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
   const { user, loading, connectionError } = useSession()
   if (loading) return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Loading session" /></Box>
   if (connectionError) return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center', p: 3 }}><Alert severity="error" sx={{ maxWidth: 560 }}>The Linda workspace cannot reach its API. {connectionError}</Alert></Box>
-  if (!user) return <Suspense fallback={<PageFallback />}><Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes></Suspense>
+  if (!user) return <Suspense fallback={<PageFallback />}><Routes><Route path="/login" element={<LoginPage />} /><Route path="/developers" element={<DeveloperDocsPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes></Suspense>
   return <Shell {...props}><Suspense fallback={<PageFallback />}><Routes>
     <Route path="/" element={<InboxPage />} />
     <Route path="/cases" element={<CasesPage />} /><Route path="/cases/:caseId" element={<CaseDetailPage />} />
     <Route path="/audit" element={<AuditPage />} /><Route path="/library" element={<LibraryPage />} />
     <Route path="/sources" element={<SourcesPage />} />
     <Route path="/integrations" element={<IntegrationsPage />} />
+    <Route path="/developers" element={<DeveloperDocsPage />} />
     <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense></Shell>
