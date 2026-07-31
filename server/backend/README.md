@@ -7,7 +7,7 @@ audit, exports, the partner API, and constrained action/blocker assists.
 cd server/backend
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
-.venv/bin/uvicorn app.main:app --reload --port 8000
+.venv/bin/uvicorn app.main:app --reload --port 8001
 ```
 
 The service auto-seeds fictional demo users in `DEMO_MODE`. Every persona's

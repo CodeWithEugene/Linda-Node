@@ -45,7 +45,7 @@ cd server/backend
 python -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 cp .env.example .env
-.venv/bin/uvicorn app.main:app --reload --port 8000
+.venv/bin/uvicorn app.main:app --reload --port 8001
 ```
 
 Frontend (Node 20+):
@@ -57,8 +57,11 @@ npm run dev
 ```
 
 The browser opens at `http://localhost:5173`. The API runs at
-`http://localhost:8000`; its CORS allowlist is configured through
+`http://localhost:8001`; its CORS allowlist is configured through
 `CORS_ORIGINS`.
+
+Port `8001` avoids a commonly occupied local `8000` service. To use another
+API origin, set `LINDA_API_ORIGIN` before starting Vite.
 
 ## Demo access and safety
 

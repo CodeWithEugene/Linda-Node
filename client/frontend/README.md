@@ -16,5 +16,5 @@ npm run dev
 ```
 
 The development server proxies `/api`, `/cap`, and `/integration` to
-`http://localhost:8000`. It follows the operating system color scheme by
+`http://localhost:8001`. It follows the operating system color scheme by
 default; the AppBar lets the user persist an explicit light or dark override.

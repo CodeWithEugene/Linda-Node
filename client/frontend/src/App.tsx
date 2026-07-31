@@ -1,6 +1,19 @@
 import { createContext, lazy, ReactNode, Suspense, useContext, useEffect, useMemo, useState } from 'react'
 import { Alert, AppBar, Box, Button, Chip, CircularProgress, CssBaseline, Dialog, DialogContent, DialogTitle, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, Snackbar, Stack, ThemeProvider, Toolbar, Tooltip, Typography, useMediaQuery } from '@mui/material'
-import { AccountTree, AdminPanelSettings, Brightness4, Brightness7, DarkMode, FactCheck, Gavel, HelpOutline, LightMode, Logout, Menu as MenuIcon, Policy, Source, WarningAmber } from '@mui/icons-material'
+import AccountTree from '@mui/icons-material/AccountTree'
+import AdminPanelSettings from '@mui/icons-material/AdminPanelSettings'
+import Brightness4 from '@mui/icons-material/Brightness4'
+import Brightness7 from '@mui/icons-material/Brightness7'
+import DarkMode from '@mui/icons-material/DarkMode'
+import FactCheck from '@mui/icons-material/FactCheck'
+import Gavel from '@mui/icons-material/Gavel'
+import HelpOutline from '@mui/icons-material/HelpOutline'
+import LightMode from '@mui/icons-material/LightMode'
+import Logout from '@mui/icons-material/Logout'
+import MenuIcon from '@mui/icons-material/Menu'
+import Policy from '@mui/icons-material/Policy'
+import Source from '@mui/icons-material/Source'
+import WarningAmber from '@mui/icons-material/WarningAmber'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, post, User } from './api'
 import { themeFor, ThemePreference } from './theme'
@@ -26,6 +39,7 @@ export function App() {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)')
   const mode = preference === 'system' ? (prefersDark ? 'dark' : 'light') : preference
   useEffect(() => localStorage.setItem('linda-theme', preference), [preference])
+  useEffect(() => { document.getElementById('app-loader')?.remove() }, [])
   return <ThemeProvider theme={themeFor(mode)}><CssBaseline /><BrowserRouter><SessionProvider><RouteGate preference={preference} setPreference={setPreference} /></SessionProvider></BrowserRouter></ThemeProvider>
 }
 
