@@ -5,7 +5,6 @@ from __future__ import annotations
 import html
 import io
 import json
-import sqlite3
 import zipfile
 from pathlib import Path
 from string import Template
@@ -15,7 +14,8 @@ from xml.etree import ElementTree as ET
 from lxml import etree
 from weasyprint import HTML
 
-from .config import CONTENT_ROOT, EXPORT_ROOT
+from .blob_store import read_export, store_export
+from .config import CONTENT_ROOT
 from .db import append_event
 from .domain import canonical_json, new_id, now, sha256
 from .husika_contract import metadata as husika_contract_metadata
@@ -30,17 +30,18 @@ CAP_SCHEMA = etree.XMLSchema(etree.parse(str(CAP_XSD_PATH)))
 TEMPLATE_ROOT = Path(CONTENT_ROOT) / "templates"
 
 
-def _export_path(case_id: str, export_id: str, suffix: str) -> Path:
-    folder = EXPORT_ROOT / case_id
-    folder.mkdir(parents=True, exist_ok=True)
-    return folder / f"{export_id}.{suffix}"
+MEDIA_TYPES = {
+    "pdf": "application/pdf",
+    "xml": "application/xml",
+    "zip": "application/zip",
+    "json": "application/json",
+}
 
 
-def _store(conn: sqlite3.Connection, case_id: str, actor_id: str, kind: str, suffix: str, payload: bytes, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+def _store(conn: Any, case_id: str, actor_id: str, kind: str, suffix: str, payload: bytes, meta: dict[str, Any] | None = None) -> dict[str, Any]:
     export_id = new_id("exp")
-    path = _export_path(case_id, export_id, suffix)
-    path.write_bytes(payload)
-    record = {"id": export_id, "case_id": case_id, "kind": kind, "file_path": str(path), "sha256": sha256(payload), "generated_by": actor_id, "generated_at": now(), "meta_json": canonical_json(meta or {})}
+    location = store_export(case_id, export_id, suffix, payload, MEDIA_TYPES.get(suffix, "application/octet-stream"))
+    record = {"id": export_id, "case_id": case_id, "kind": kind, "file_path": location, "sha256": sha256(payload), "generated_by": actor_id, "generated_at": now(), "meta_json": canonical_json(meta or {})}
     conn.execute(
         """INSERT INTO exports (id,case_id,kind,file_path,sha256,generated_by,generated_at,meta_json)
            VALUES (:id,:case_id,:kind,:file_path,:sha256,:generated_by,:generated_at,:meta_json)""", record,
@@ -49,7 +50,7 @@ def _store(conn: sqlite3.Connection, case_id: str, actor_id: str, kind: str, suf
     return {**record, "meta": meta or {}}
 
 
-def packet_manifest(conn: sqlite3.Connection, case_id: str) -> dict[str, Any]:
+def packet_manifest(conn: Any, case_id: str) -> dict[str, Any]:
     case = get_case(conn, case_id)
     approvals = verify_approvals(conn, case_id)
     event_check = verify_event_chain(conn, case_id)
@@ -100,7 +101,7 @@ def _render_packet(manifest: dict[str, Any], template_name: str) -> str:
     return Template((TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")).safe_substitute(values)
 
 
-def generate_packet(conn: sqlite3.Connection, case_id: str, actor_id: str) -> list[dict[str, Any]]:
+def generate_packet(conn: Any, case_id: str, actor_id: str) -> list[dict[str, Any]]:
     manifest = packet_manifest(conn, case_id)
     json_export = _store(conn, case_id, actor_id, "packet_json", "json", canonical_json(manifest).encode(), {"manifest_sha256": manifest["manifest_sha256"]})
     pdf = HTML(string=_render_packet(manifest, "packet.html")).write_pdf()
@@ -132,7 +133,7 @@ def validate_cap(payload: bytes) -> None:
         raise ValueError(f"CAP 1.2 XSD validation failed: {exc}") from exc
 
 
-def generate_cap(conn: sqlite3.Connection, case_id: str, actor_id: str) -> dict[str, Any]:
+def generate_cap(conn: Any, case_id: str, actor_id: str) -> dict[str, Any]:
     case = get_case(conn, case_id)
     if case["state"] not in {"APPROVED", "HANDED_OFF", "REVOKED"}:
         raise ValueError("CAP exports require an approved, handed-off, or revoked case")
@@ -163,7 +164,7 @@ def husika_payload(case: dict[str, Any], message: str | None = None, language: s
     return payload
 
 
-def generate_husika(conn: sqlite3.Connection, case_id: str, actor_id: str, message: str | None, language: str) -> dict[str, Any]:
+def generate_husika(conn: Any, case_id: str, actor_id: str, message: str | None, language: str) -> dict[str, Any]:
     case = get_case(conn, case_id)
     if case["state"] not in {"APPROVED", "HANDED_OFF", "REVOKED"}:
         raise ValueError("Husika payloads require an approved, handed-off, or revoked case")
@@ -171,7 +172,7 @@ def generate_husika(conn: sqlite3.Connection, case_id: str, actor_id: str, messa
     return _store(conn, case_id, actor_id, "husika_payload", "json", canonical_json(payload).encode(), {"contract_valid": True, "openapi_snapshot_sha256": payload["openapi_snapshot"]["sha256"], "language": language})
 
 
-def generate_bundle(conn: sqlite3.Connection, case_id: str, actor_id: str) -> dict[str, Any]:
+def generate_bundle(conn: Any, case_id: str, actor_id: str) -> dict[str, Any]:
     case = get_case(conn, case_id)
     if case["state"] not in {"APPROVED", "HANDED_OFF", "REVOKED"}:
         raise ValueError("Offline bundles require an approved, handed-off, or revoked case")
@@ -187,17 +188,18 @@ def generate_bundle(conn: sqlite3.Connection, case_id: str, actor_id: str) -> di
     return _store(conn, case_id, actor_id, "field_bundle", "zip", output.getvalue(), {"contents": list(contents), "offline": True})
 
 
-def exported_file(conn: sqlite3.Connection, export_id: str) -> tuple[dict[str, Any], Path]:
+def exported_payload(conn: Any, export_id: str) -> tuple[dict[str, Any], bytes]:
     row = conn.execute("SELECT * FROM exports WHERE id = ?", (export_id,)).fetchone()
     if not row:
         raise FileNotFoundError(export_id)
-    record = dict(row); path = Path(record["file_path"])
-    if not path.is_file():
-        raise FileNotFoundError(export_id)
-    return record, path
+    record = dict(row)
+    try:
+        return record, read_export(record["file_path"])
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(export_id) from exc
 
 
-def published_cap_feed(conn: sqlite3.Connection) -> bytes:
+def published_cap_feed(conn: Any) -> bytes:
     atom = "http://www.w3.org/2005/Atom"; ET.register_namespace("", atom)
     feed = ET.Element(f"{{{atom}}}feed"); ET.SubElement(feed, f"{{{atom}}}title").text = "Linda Protocol Exercise CAP Feed"; ET.SubElement(feed, f"{{{atom}}}updated").text = now()
     for row in conn.execute("SELECT * FROM decision_cases WHERE state IN ('APPROVED','HANDED_OFF','REVOKED') ORDER BY updated_at DESC"):

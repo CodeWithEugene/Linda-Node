@@ -17,17 +17,17 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import assists
 from .auth import current_user, login, require_role
-from .config import settings
+from .config import CONTENT_ROOT, settings
 from .db import RecordedVersionConflict, append_event, connection, init_db, reset_demo, transaction
 from .exports import (
     cap_xml,
-    exported_file,
+    exported_payload,
     generate_bundle,
     generate_cap,
     generate_husika,
@@ -65,7 +65,14 @@ from .services import (
     verify_event_chain,
 )
 from .sources import areas as source_areas
-from .sources import get_snapshot, list_snapshots, refresh_all, set_source_mode, signals, source_mode
+from .sources import (
+    get_snapshot,
+    list_snapshots,
+    refresh_all,
+    set_source_mode,
+    signals,
+    source_mode,
+)
 
 
 class LoginInput(BaseModel):
@@ -338,11 +345,13 @@ def exports(case_id: str, export_kind: str, payload: ExportInput, user: dict[str
 
 
 @app.get("/api/exports/{export_id}/download")
-def download(export_id: str, _: dict[str, Any] = Depends(current_user)) -> FileResponse:
+def download(export_id: str, _: dict[str, Any] = Depends(current_user)) -> Response:
     with connection() as conn:
-        try: record, path = exported_file(conn, export_id)
+        try: record, payload = exported_payload(conn, export_id)
         except FileNotFoundError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Export not found") from exc
-    return FileResponse(path, filename=path.name, media_type={"packet_pdf": "application/pdf", "cap_xml": "application/xml", "field_bundle": "application/zip"}.get(record["kind"], "application/json"))
+    suffix = {"packet_pdf": "pdf", "cap_xml": "xml", "field_bundle": "zip", "packet_json": "json", "husika_payload": "json"}.get(record["kind"], "json")
+    media_type = {"pdf": "application/pdf", "xml": "application/xml", "zip": "application/zip"}.get(suffix, "application/json")
+    return Response(payload, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{record["id"]}.{suffix}"'})
 
 
 @app.get("/api/library/policy")
@@ -478,7 +487,7 @@ def integration_openapi() -> dict[str, Any]:
 
 @app.get("/integration/v1/schemas/activation.json")
 def integration_activation_schema() -> dict[str, Any]:
-    path = Path(settings.database_path).parents[0].parent / "content" / "schemas" / "integration" / "activation.v1.schema.json"
+    path = Path(CONTENT_ROOT) / "schemas" / "integration" / "activation.v1.schema.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

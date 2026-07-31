@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,13 @@ except ImportError:  # pragma: no cover - only helps a bare source checkout
 from .config import settings
 from .domain import canonical_json, loads, new_id, now, sha256
 from .library import action_cards, policy
+
+try:  # PostgreSQL is only required for Vercel production deployments.
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:  # pragma: no cover - local SQLite users can install only the base runtime
+    psycopg = None  # type: ignore[assignment]
+    dict_row = None  # type: ignore[assignment]
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -144,6 +152,160 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 );
 """
 
+POSTGRES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  display_name TEXT NOT NULL,
+  role TEXT NOT NULL,
+  org TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  signing_key TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS source_snapshots (
+  id TEXT PRIMARY KEY,
+  adapter TEXT NOT NULL,
+  endpoint_url TEXT NOT NULL,
+  retrieved_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  payload_sha256 TEXT NOT NULL,
+  schema_ok SMALLINT NOT NULL,
+  freshness TEXT NOT NULL,
+  logical_key TEXT NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS source_snapshots_lookup ON source_snapshots(logical_key, retrieved_at DESC);
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS decision_cases (
+  id TEXT PRIMARY KEY,
+  area_id TEXT NOT NULL,
+  area_name TEXT NOT NULL,
+  hazard TEXT NOT NULL,
+  title TEXT NOT NULL,
+  state TEXT NOT NULL,
+  policy_version_id TEXT NOT NULL,
+  assessment_json TEXT NOT NULL DEFAULT '{}',
+  evidence_json TEXT NOT NULL DEFAULT '[]',
+  action_card_ids_json TEXT NOT NULL DEFAULT '[]',
+  stage TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS readiness_tasks (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL REFERENCES decision_cases(id),
+  action_card_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  owner_role TEXT NOT NULL,
+  owner_user_id TEXT,
+  criticality TEXT NOT NULL,
+  state TEXT NOT NULL,
+  blocker_code TEXT,
+  blocker_note TEXT,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS approvals (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL REFERENCES decision_cases(id),
+  role TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  comment TEXT,
+  signed_digest TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  signed_at TEXT NOT NULL,
+  superseded SMALLINT NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS approvals_live_role ON approvals(case_id, role) WHERE superseded = 0;
+CREATE TABLE IF NOT EXISTS case_events (
+  seq BIGSERIAL PRIMARY KEY,
+  id TEXT UNIQUE NOT NULL,
+  case_id TEXT NOT NULL REFERENCES decision_cases(id),
+  actor_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  data TEXT NOT NULL,
+  prev_hash TEXT NOT NULL,
+  this_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS exports (
+  id TEXT PRIMARY KEY,
+  case_id TEXT NOT NULL REFERENCES decision_cases(id),
+  kind TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  generated_by TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE TABLE IF NOT EXISTS integration_keys (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  key_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+  id TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  events_json TEXT NOT NULL,
+  secret TEXT NOT NULL,
+  active SMALLINT NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id TEXT PRIMARY KEY,
+  subscription_id TEXT NOT NULL REFERENCES webhook_subscriptions(id),
+  case_id TEXT NOT NULL,
+  event TEXT NOT NULL,
+  attempt INTEGER NOT NULL,
+  status_code INTEGER,
+  delivered SMALLINT NOT NULL DEFAULT 0,
+  attempted_at TEXT NOT NULL
+);
+"""
+
+
+def _postgres_sql(statement: str, params: object) -> str:
+    """Translate the deliberately small SQLite query dialect used by the app."""
+    if isinstance(params, Mapping):
+        return re.sub(r"(?<!:):([A-Za-z_]\w*)", r"%(\1)s", statement)
+    return statement.replace("?", "%s")
+
+
+class PostgresConnection:
+    def __init__(self, raw: Any):
+        self.raw = raw
+
+    def execute(self, statement: str, params: object = ()) -> Any:
+        return self.raw.execute(_postgres_sql(statement, params), params)
+
+    def executescript(self, script: str) -> None:
+        for statement in script.split(";"):
+            if statement.strip():
+                self.raw.execute(statement)
+
+    def commit(self) -> None:
+        self.raw.commit()
+
+    def rollback(self) -> None:
+        self.raw.rollback()
+
+    def close(self) -> None:
+        self.raw.close()
+
+    def __enter__(self) -> "PostgresConnection":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
 
 class RecordedVersionConflict(Exception):
     """A stale edit that has already been committed to the audit chain.
@@ -160,7 +322,13 @@ class RecordedVersionConflict(Exception):
         super().__init__("This case changed. Reload before trying again.")
 
 
-def connection() -> sqlite3.Connection:
+def connection() -> Any:
+    if settings.database_engine == "postgres":
+        if psycopg is None or dict_row is None:
+            raise RuntimeError("PostgreSQL support requires psycopg. Install the production dependencies.")
+        return PostgresConnection(psycopg.connect(settings.database_url, row_factory=dict_row))
+    if settings.database_path is None:  # defensive: keeps local configuration errors clear
+        raise RuntimeError("SQLite requires a sqlite:/// DATABASE_URL")
     conn = sqlite3.connect(settings.database_path, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -168,13 +336,13 @@ def connection() -> sqlite3.Connection:
 
 
 @contextmanager
-def transaction() -> Iterator[sqlite3.Connection]:
+def transaction() -> Iterator[Any]:
     conn = connection()
     try:
         # Serialize writers before they read a version or event-chain head.
         # This prevents two requests from both validating the same case
         # version and producing competing hash-chain links.
-        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("BEGIN" if settings.database_engine == "postgres" else "BEGIN IMMEDIATE")
         yield conn
         conn.commit()
     except RecordedVersionConflict:
@@ -240,8 +408,8 @@ def append_event(conn: sqlite3.Connection, case_id: str, actor_id: str, event_ty
 
 def init_db() -> None:
     with transaction() as conn:
-        conn.executescript(SCHEMA)
-        if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+        conn.executescript(POSTGRES_SCHEMA if settings.database_engine == "postgres" else SCHEMA)
+        if conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"] == 0:
             seed_demo(conn)
         if not conn.execute("SELECT 1 FROM app_settings WHERE key = 'source_mode'").fetchone():
             conn.execute("INSERT INTO app_settings (key,value) VALUES ('source_mode','live_first')")
@@ -258,11 +426,14 @@ def seed_demo(conn: sqlite3.Connection) -> None:
     ]
     for user_id, email, display_name, role, org in users:
         conn.execute(
-            """INSERT OR REPLACE INTO users (id,email,display_name,role,org,password_hash,signing_key,created_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
+            """INSERT INTO users (id,email,display_name,role,org,password_hash,signing_key,created_at)
+               VALUES (?,?,?,?,?,?,?,?)
+               ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name,
+               role = EXCLUDED.role, org = EXCLUDED.org, password_hash = EXCLUDED.password_hash,
+               signing_key = EXCLUDED.signing_key, created_at = EXCLUDED.created_at""",
             (user_id, email, display_name, role, org, _password_hash("linda-demo"), secrets.token_hex(32), now()),
         )
-    existing = conn.execute("SELECT COUNT(*) FROM decision_cases").fetchone()[0]
+    existing = conn.execute("SELECT COUNT(*) AS count FROM decision_cases").fetchone()["count"]
     if existing:
         return
     policy_id = policy()["id"]
@@ -329,11 +500,11 @@ def reset_demo() -> None:
         seed_demo(conn)
 
 
-def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+def row_to_dict(row: Mapping[str, Any] | sqlite3.Row | None) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def parse_case(row: sqlite3.Row) -> dict[str, Any]:
+def parse_case(row: Mapping[str, Any] | sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     item["assessment"] = loads(item.pop("assessment_json"), {})
     item["evidence"] = loads(item.pop("evidence_json"), [])
