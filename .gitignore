@@ -10,8 +10,18 @@ data/
 
 # Dependencies & build output
 node_modules/
-__pycache__/
-*.pyc
 .next/
 dist/
+
+# Tooling and local runtime state
 .gstack/
+server/backend/.venv/
+server/backend/var/
+server/backend/*.egg-info/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+
+# Local planning and research notes
+what-to-build.md
+research.md

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linda-protocol.example/integration/v1/schemas/activation.json",
+  "title": "Linda Protocol Integration Activation v1",
+  "type": "object",
+  "required": ["mode", "disclaimer", "id", "area", "hazard", "stage", "state", "assessment", "approvals", "evidence", "links"],
+  "properties": {
+    "mode": {"const": "exercise"},
+    "disclaimer": {"type": "string"},
+    "id": {"type": "string"},
+    "title": {"type": "string"},
+    "area": {"type": "object", "required": ["id", "name"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+    "hazard": {"type": "string"},
+    "stage": {"type": ["string", "null"]},
+    "state": {"enum": ["APPROVED", "HANDED_OFF", "REVOKED"]},
+    "assessment": {"type": "object"},
+    "approvals": {"type": "array"},
+    "evidence": {"type": "array"},
+    "links": {"type": "object"}
+  }
+}

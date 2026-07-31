@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Linda Protocol Action Matcher v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates"],
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["card_id", "rationale", "rank"],
+        "properties": {
+          "card_id": {"type": "string", "minLength": 1},
+          "rationale": {"type": "string", "minLength": 1, "maxLength": 500},
+          "rank": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}

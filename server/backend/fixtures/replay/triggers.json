@@ -1,0 +1,4 @@
+{
+  "rules": [{"id": "rule_bungoma", "name": "Bungoma Triggers", "area_id": "KEN.3_1", "hazard": "drought", "indicator": "spi3_chirps_forecast", "severity": "moderate", "active": true}],
+  "events": [{"id": "event_bungoma", "name": "Bungoma drought signal", "area_id": "KEN.3_1", "hazard": "drought", "indicator": "spi3_chirps_forecast", "value": 0.52, "severity": "moderate", "active": true}, {"id": "event_flood_bungoma", "name": "Bungoma rainfall signal", "area_id": "KEN.3_1", "hazard": "flood", "indicator": "rainfall", "value": 0.71, "severity": "low", "active": true}]
+}
