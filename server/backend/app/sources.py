@@ -23,6 +23,7 @@ SOURCE_DEFINITIONS = {
     "triggers": ("/api/triggers/rules/", "triggers.json"),
     "forecasts": ("/api/datasets/forecasts/available/?forecast_type=return_period", "forecasts.json"),
     "areas": ("/api/areas/areas/?level=1&code=KEN", "areas.json"),
+    "pipeline": ("", "pipeline.json"),
 }
 
 
@@ -109,6 +110,9 @@ def refresh_adapter(conn: sqlite3.Connection, adapter: str, force: bool = False)
         return cached
     mode = source_mode(conn)
     endpoint_path, _ = SOURCE_DEFINITIONS[adapter]
+    if adapter == "pipeline":
+        payload, fixture_path = _fixture(adapter)
+        return _store(conn, adapter, fixture_path, payload, "replay", True, {"mode": mode, "fixture": True, "format": "exceedance_probability_csv"})
     if mode != "replay_only":
         try:
             if adapter == "triggers":
@@ -166,6 +170,7 @@ def signals(conn: sqlite3.Connection) -> dict[str, Any]:
         "rules": [{**item, "snapshot_id": trigger["id"], "freshness": trigger["freshness"]} for item in trigger["payload"].get("rules", [])],
         "events": [{**item, "snapshot_id": trigger["id"], "freshness": trigger["freshness"]} for item in trigger["payload"].get("events", [])],
         "forecasts": [{**item, "snapshot_id": latest["forecasts"]["id"], "freshness": latest["forecasts"]["freshness"]} for item in latest["forecasts"]["payload"].get("forecasts", [])],
+        "pipeline": [{**item, "snapshot_id": latest["pipeline"]["id"], "freshness": latest["pipeline"]["freshness"]} for item in latest["pipeline"]["payload"].get("files", [])],
     }
 
 

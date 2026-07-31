@@ -75,7 +75,7 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
     <Route path="/sources" element={<SourcesPage />} />
     <Route path="/integrations" element={<IntegrationsPage />} />
     <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
-    <Route path="*" element={<Navigate to="/cases" replace />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
   </Routes></Suspense></Shell>
 }
 

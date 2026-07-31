@@ -188,7 +188,7 @@ def test_replay_sources_can_assess_a_new_case() -> None:
         source_status = client.get("/api/sources/status")
         assert source_status.status_code == 200
         snapshots = source_status.json()["sources"]
-        assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas"}
+        assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas", "pipeline"}
         created = client.post("/api/cases", json={"title": "New replay assessment", "area_id": "KEN.3_1", "area_name": "Bungoma", "hazard": "drought"})
         assert created.status_code == 201
         case = created.json()
