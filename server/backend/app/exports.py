@@ -12,7 +12,9 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from lxml import etree
-from weasyprint import HTML
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import simpleSplit
+from reportlab.pdfgen import canvas
 
 from .blob_store import read_export, store_export
 from .config import CONTENT_ROOT
@@ -101,10 +103,45 @@ def _render_packet(manifest: dict[str, Any], template_name: str) -> str:
     return Template((TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")).safe_substitute(values)
 
 
+def _portable_packet_pdf(manifest: dict[str, Any]) -> bytes:
+    """Render a readable PDF when a serverless runtime lacks Pango/WeasyPrint."""
+    output = io.BytesIO()
+    document = canvas.Canvas(output, pagesize=A4, pageCompression=1)
+    width, height = A4
+    margin = 42
+    y = height - margin
+    document.setTitle(f"Linda Protocol decision packet {manifest['case']['id']}")
+    document.setFont("Helvetica-Bold", 15)
+    document.drawString(margin, y, "Linda Protocol — Decision Packet")
+    y -= 26
+    document.setFont("Helvetica", 8.5)
+    for line in json.dumps(manifest, indent=2, ensure_ascii=False).splitlines():
+        lines = simpleSplit(line, "Helvetica", 8.5, width - margin * 2) or [""]
+        for wrapped in lines:
+            if y < margin:
+                document.showPage()
+                document.setFont("Helvetica", 8.5)
+                y = height - margin
+            document.drawString(margin, y, wrapped)
+            y -= 11
+    document.save()
+    return output.getvalue()
+
+
+def _packet_pdf(manifest: dict[str, Any]) -> bytes:
+    """Prefer the designed HTML packet, with a portable Vercel-safe fallback."""
+    try:
+        from weasyprint import HTML
+
+        return HTML(string=_render_packet(manifest, "packet.html")).write_pdf()
+    except (ImportError, OSError):
+        return _portable_packet_pdf(manifest)
+
+
 def generate_packet(conn: Any, case_id: str, actor_id: str) -> list[dict[str, Any]]:
     manifest = packet_manifest(conn, case_id)
     json_export = _store(conn, case_id, actor_id, "packet_json", "json", canonical_json(manifest).encode(), {"manifest_sha256": manifest["manifest_sha256"]})
-    pdf = HTML(string=_render_packet(manifest, "packet.html")).write_pdf()
+    pdf = _packet_pdf(manifest)
     pdf_export = _store(conn, case_id, actor_id, "packet_pdf", "pdf", pdf, {"manifest_sha256": manifest["manifest_sha256"], "renderer": "weasyprint"})
     return [json_export, pdf_export]
 

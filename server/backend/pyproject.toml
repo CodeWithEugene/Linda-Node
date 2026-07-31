@@ -14,6 +14,7 @@ dependencies = [
   "lxml>=5.3",
   "weasyprint>=62",
   "psycopg[binary]>=3.2",
+  "reportlab>=4.2",
   "vercel>=0.7.2",
 ]
 
