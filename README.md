@@ -147,6 +147,12 @@ Copy [`server/backend/.env.example`](server/backend/.env.example) to `server/bac
 | `GEMINI_API_KEY` | Optional. When absent, assist controls are disabled and the workflow still works. |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to use cookie sessions. |
 | `COOKIE_SECURE` | Set to `true` behind HTTPS. |
+| `LINDA_API_ORIGIN` | Server-only upstream URL used by the Vercel frontend proxy. |
+| `VITE_LINDA_API_ORIGIN` | Optional public frontend build-time API origin. Prefer the Vercel proxy for cookie-session deployments. |
+
+### Vercel frontend and hosted API
+
+Vercel serves the React client but does not run the stateful SQLite API. Deploy `server/backend` as a long-running container with persistent storage, then set the Vercel project's production `LINDA_API_ORIGIN` to that HTTPS origin and redeploy the frontend. The included Vercel proxy keeps browser requests same-origin, including the session cookie. The API host must set `LINDA_SECRET`, `COOKIE_SECURE=true`, `PUBLIC_BASE_URL=https://linda-protocol.vercel.app`, and a persistent `DATABASE_URL`/volume. Do not use an ephemeral serverless filesystem for the workflow database or generated decision artifacts.
 
 ## Safety and limitations
 

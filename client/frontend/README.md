@@ -10,7 +10,9 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The Vite development server proxies `/api`, `/cap`, and `/integration` to `http://127.0.0.1:8001` by default. Set `LINDA_API_ORIGIN` before starting Vite to point at another API origin.
+Open `http://127.0.0.1:5173`. The Vite development server proxies `/api`, `/cap`, and `/integration` to `http://127.0.0.1:8001` by default. Set `LINDA_API_ORIGIN` before starting Vite to point the development proxy at another API origin.
+
+For a Vercel deployment, `vercel.json` proxies `/api`, `/cap`, and `/integration` through a same-origin serverless proxy. Set the server-only `LINDA_API_ORIGIN` environment variable in the Vercel project to the public HTTPS backend origin. This keeps the cookie session on the frontend origin. `VITE_LINDA_API_ORIGIN` remains available for deployments that deliberately call the API directly; it is public build-time configuration and must never contain a secret.
 
 ## Screens
 

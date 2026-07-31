@@ -28,7 +28,7 @@ const InboxPage = lazy(() => import('./pages').then((module) => ({ default: modu
 const SourcesPage = lazy(() => import('./pages').then((module) => ({ default: module.SourcesPage })))
 const PlaceholderPage = lazy(() => import('./pages').then((module) => ({ default: module.PlaceholderPage })))
 
-type Session = { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<void>; logout: () => Promise<void> }
+type Session = { user: User | null; loading: boolean; connectionError: string | null; login: (email: string, password: string) => Promise<void>; logout: () => Promise<void> }
 const SessionContext = createContext<Session | null>(null)
 export const useSession = () => {
   const value = useContext(SessionContext)
@@ -46,15 +46,25 @@ export function App() {
 }
 
 function SessionProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null); const [loading, setLoading] = useState(true)
-  useEffect(() => { api<User>('/api/me').then(setUser).catch(() => setUser(null)).finally(() => setLoading(false)) }, [])
-  const value = useMemo(() => ({ user, loading, login: async (email: string, password: string) => setUser(await post<User>('/api/auth/login', { email, password })), logout: async () => { await post<void>('/api/auth/logout'); setUser(null) } }), [user, loading])
+  const [user, setUser] = useState<User | null>(null); const [loading, setLoading] = useState(true); const [connectionError, setConnectionError] = useState<string | null>(null)
+  useEffect(() => {
+    api<User>('/api/me')
+      .then(setUser)
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : 'The Linda API could not be reached.'
+        if (!message.includes('Sign in is required') && !message.includes('Request failed (401)')) setConnectionError(message)
+        setUser(null)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+  const value = useMemo(() => ({ user, loading, connectionError, login: async (email: string, password: string) => setUser(await post<User>('/api/auth/login', { email, password })), logout: async () => { await post<void>('/api/auth/logout'); setUser(null) } }), [user, loading, connectionError])
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }
 
 function RouteGate(props: { preference: ThemePreference; setPreference: (value: ThemePreference) => void }) {
-  const { user, loading } = useSession()
+  const { user, loading, connectionError } = useSession()
   if (loading) return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Loading session" /></Box>
+  if (connectionError) return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center', p: 3 }}><Alert severity="error" sx={{ maxWidth: 560 }}>The Linda workspace cannot reach its API. {connectionError}</Alert></Box>
   if (!user) return <Suspense fallback={<PageFallback />}><Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes></Suspense>
   return <Shell {...props}><Suspense fallback={<PageFallback />}><Routes>
     <Route path="/" element={<InboxPage />} />

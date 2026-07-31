@@ -10,11 +10,13 @@ data/
 
 # Dependencies & build output
 node_modules/
+.vite/
 .next/
 dist/
 
 # Tooling and local runtime state
 .gstack/
+.vercel/
 server/backend/.venv/
 server/backend/var/
 server/backend/*.egg-info/
@@ -25,3 +27,4 @@ __pycache__/
 # Local planning and research notes
 what-to-build.md
 research.md
+.vercel

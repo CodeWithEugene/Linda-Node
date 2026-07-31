@@ -8,8 +8,36 @@ export type DecisionCase = { id: string; area_id: string; area_name: string; haz
 
 type ApiError = { error?: { message?: string; detail?: unknown } }
 
+const apiOrigin = (import.meta.env.VITE_LINDA_API_ORIGIN || '').trim().replace(/\/+$/, '')
+
+function apiUrl(path: string): string {
+  return apiOrigin ? `${apiOrigin}${path}` : path
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) }, ...init })
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 12_000)
+  const abortFromCaller = () => controller.abort()
+  init.signal?.addEventListener('abort', abortFromCaller, { once: true })
+
+  let response: Response
+  try {
+    response = await fetch(apiUrl(path), {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+      ...init,
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('The Linda API did not respond. Check the API deployment and try again.')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+    init.signal?.removeEventListener('abort', abortFromCaller)
+  }
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as ApiError
     throw new Error(error.error?.message || (typeof error.error?.detail === 'string' ? error.error.detail : `Request failed (${response.status})`))
