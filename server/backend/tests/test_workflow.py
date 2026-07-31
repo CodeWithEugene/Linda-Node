@@ -33,6 +33,18 @@ def sign_in(client: TestClient, email: str) -> None:
     assert response.status_code == 200, response.text
 
 
+def test_logout_clears_the_cookie_session() -> None:
+    reset_demo()
+    with TestClient(app) as client:
+        sign_in(client, "david.drm@demo")
+        assert client.get("/api/me").status_code == 200
+
+        response = client.post("/api/auth/logout")
+
+        assert response.status_code == 204
+        assert client.get("/api/me").status_code == 401
+
+
 def current_case(client: TestClient) -> dict:
     response = client.get(f"/api/cases/{CASE_ID}")
     assert response.status_code == 200, response.text

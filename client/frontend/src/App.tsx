@@ -2,6 +2,7 @@ import { createContext, lazy, ReactNode, Suspense, useContext, useEffect, useMem
 import { Alert, AppBar, Box, Button, Chip, CircularProgress, CssBaseline, Dialog, DialogContent, DialogTitle, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, Snackbar, Stack, ThemeProvider, Toolbar, Tooltip, Typography, useMediaQuery } from '@mui/material'
 import AccountTree from '@mui/icons-material/AccountTree'
 import AdminPanelSettings from '@mui/icons-material/AdminPanelSettings'
+import Api from '@mui/icons-material/Api'
 import Brightness4 from '@mui/icons-material/Brightness4'
 import Brightness7 from '@mui/icons-material/Brightness7'
 import DarkMode from '@mui/icons-material/DarkMode'
@@ -25,6 +26,7 @@ const CaseDetailPage = lazy(() => import('./pages').then((module) => ({ default:
 const CasesPage = lazy(() => import('./pages').then((module) => ({ default: module.CasesPage })))
 const LibraryPage = lazy(() => import('./pages').then((module) => ({ default: module.LibraryPage })))
 const InboxPage = lazy(() => import('./pages').then((module) => ({ default: module.InboxPage })))
+const IntegrationsPage = lazy(() => import('./pages').then((module) => ({ default: module.IntegrationsPage })))
 const SourcesPage = lazy(() => import('./pages').then((module) => ({ default: module.SourcesPage })))
 const PlaceholderPage = lazy(() => import('./pages').then((module) => ({ default: module.PlaceholderPage })))
 
@@ -71,6 +73,7 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
     <Route path="/cases" element={<CasesPage />} /><Route path="/cases/:caseId" element={<CaseDetailPage />} />
     <Route path="/audit" element={<AuditPage />} /><Route path="/library" element={<LibraryPage />} />
     <Route path="/sources" element={<SourcesPage />} />
+    <Route path="/integrations" element={<IntegrationsPage />} />
     <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/cases" replace />} />
   </Routes></Suspense></Shell>
@@ -79,7 +82,7 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
 function PageFallback() { return <Box minHeight="45vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Loading page" /></Box> }
 
 const navigation = [
-  ['/', 'Signal Inbox', <Source />], ['/cases', 'Decision Cases', <FactCheck />], ['/audit', 'Audit Log', <AccountTree />], ['/library', 'Policy & Actions', <Policy />], ['/sources', 'Sources', <Source />],
+  ['/', 'Signal Inbox', <Source />], ['/cases', 'Decision Cases', <FactCheck />], ['/audit', 'Audit Log', <AccountTree />], ['/library', 'Policy & Actions', <Policy />], ['/sources', 'Sources', <Source />], ['/integrations', 'API & Partners', <Api />],
 ] as const
 
 function Shell({ children, preference, setPreference }: { children: ReactNode; preference: ThemePreference; setPreference: (value: ThemePreference) => void }) {

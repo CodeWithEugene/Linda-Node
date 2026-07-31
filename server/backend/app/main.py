@@ -184,8 +184,14 @@ def login_route(payload: LoginInput, request: Request, response: Response) -> di
 
 
 @app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response) -> Response:
-    response.delete_cookie("linda_session")
+def logout() -> Response:
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(
+        "linda_session",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
     return response
 
 
