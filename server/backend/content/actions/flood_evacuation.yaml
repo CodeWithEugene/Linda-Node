@@ -1,0 +1,18 @@
+id: card_flood_evacuation_v1
+hazard: flood
+title: Evacuation-route pre-positioning
+description: Verify evacuation routes, transport, and safe assembly points before flooding.
+owner_role: county_drm_officer
+supporting_roles: [ngo_finance_lead]
+lead_time_days: 10
+stage_required: ready
+budget:
+  currency: USD
+  readiness_tranche: { amount: 6000, released_at_stage: ready, items: [route survey, signage] }
+  action_tranche: { amount: 30000, released_at_stage: go, items: [transport, temporary shelter support] }
+effectiveness: 0.30
+prerequisites:
+  - { id: evacuation_route, title: Evacuation routes confirmed, criticality: critical }
+evidence_required: [trigger_event]
+citations: [Illustrative demo assumption]
+disclaimer: Illustrative demo card, not an official SOP.

@@ -1,0 +1,18 @@
+id: card_flood_nfi_v1
+hazard: flood
+title: Non-food item pre-positioning
+description: Move essential household items to a county-approved staging location.
+owner_role: ngo_finance_lead
+supporting_roles: [county_drm_officer]
+lead_time_days: 14
+stage_required: ready
+budget:
+  currency: USD
+  readiness_tranche: { amount: 8000, released_at_stage: ready, items: [warehouse reservation] }
+  action_tranche: { amount: 42000, released_at_stage: go, items: [NFI procurement, last-mile transport] }
+effectiveness: 0.25
+prerequisites:
+  - { id: warehouse, title: Warehouse space confirmed, criticality: normal }
+evidence_required: [trigger_event]
+citations: [Illustrative demo assumption]
+disclaimer: Illustrative demo card, not an official SOP.

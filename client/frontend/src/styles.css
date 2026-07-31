@@ -1,0 +1,5 @@
+html, body, #root { min-height: 100%; margin: 0; }
+body { min-width: 320px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.mono { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+.dashed-ai { border: 1px dashed #0d47a1; }

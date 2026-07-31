@@ -1,0 +1,18 @@
+id: card_seed_distribution_v1
+hazard: drought
+title: Drought-tolerant seed distribution
+description: Arrange seed procurement and ward-level delivery in time for planting.
+owner_role: ngo_finance_lead
+supporting_roles: [county_drm_officer]
+lead_time_days: 75
+stage_required: set
+budget:
+  currency: USD
+  readiness_tranche: { amount: 7000, released_at_stage: ready, items: [procurement planning] }
+  action_tranche: { amount: 52000, released_at_stage: go, items: [seed packages, delivery] }
+effectiveness: 0.18
+prerequisites:
+  - { id: seed_tender, title: Seed tender approved, criticality: critical }
+evidence_required: [forecast]
+citations: [Illustrative demo assumption]
+disclaimer: Illustrative demo card, not an official SOP.
