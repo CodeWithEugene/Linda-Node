@@ -1,13 +1,31 @@
+from dataclasses import replace
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app import assists
+from app import assists, db
 from app.db import connection, reset_demo, transaction
 from app.exports import cap_xml, husika_payload, validate_cap
 from app.main import app
 from app.services import get_case, verify_event_chain
 
 CASE_ID = "case_bungoma_ond2026"
+
+
+def test_reset_demo_initializes_a_fresh_database(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep test setup independent from a pre-existing local SQLite file."""
+    fresh_settings = replace(
+        db.settings,
+        database_url=f"sqlite:///{tmp_path / 'fresh-linda.db'}",
+        database_path=tmp_path / "fresh-linda.db",
+        database_engine="sqlite",
+    )
+    monkeypatch.setattr(db, "settings", fresh_settings)
+
+    reset_demo()
+
+    with connection() as conn:
+        assert conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"] == 5
 
 
 def sign_in(client: TestClient, email: str) -> None:

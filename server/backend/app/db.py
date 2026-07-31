@@ -495,8 +495,14 @@ def seed_demo(conn: sqlite3.Connection) -> None:
 
 def reset_demo() -> None:
     with transaction() as conn:
+        # Tests and the admin reset endpoint may be the first code to touch a
+        # new database. Create the schema before clearing rows so a clean CI
+        # checkout does not depend on an earlier application startup.
+        conn.executescript(POSTGRES_SCHEMA if settings.database_engine == "postgres" else SCHEMA)
         for table in ("webhook_deliveries", "webhook_subscriptions", "integration_keys", "exports", "approvals", "readiness_tasks", "case_events", "decision_cases", "source_snapshots", "users"):
             conn.execute(f"DELETE FROM {table}")
+        if not conn.execute("SELECT 1 FROM app_settings WHERE key = 'source_mode'").fetchone():
+            conn.execute("INSERT INTO app_settings (key,value) VALUES ('source_mode','live_first')")
         seed_demo(conn)
 
 
