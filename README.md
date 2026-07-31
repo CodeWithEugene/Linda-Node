@@ -103,7 +103,7 @@ For a new case, begin in **Signal Inbox**. Open a source record, create a case, 
 | Component | Responsibility |
 |---|---|
 | `client/frontend` | React, TypeScript, and Material UI single-page application. |
-| `server/backend` | FastAPI service, SQLite persistence, policy evaluation, exports, and partner API. |
+| `server/backend` | FastAPI service, SQLite for local development or Neon Postgres on Vercel, policy evaluation, exports, and partner API. |
 | Source adapter | Retrieves or replays source data, preserves raw snapshots, and exposes freshness/provenance. |
 | Policy and action library | Versioned YAML inputs used by deterministic assessment logic. |
 | Audit chain | Append-only case events linked by SHA-256 hashes. |
@@ -140,19 +140,24 @@ Copy [`server/backend/.env.example`](server/backend/.env.example) to `server/bac
 | Variable | Purpose |
 |---|---|
 | `LINDA_SECRET` | Required secret for signed login sessions. |
-| `DATABASE_URL` | SQLite database URL; defaults to `sqlite:///var/linda.db`. |
+| `DATABASE_URL` | SQLite URL locally; Vercel injects the Neon Postgres URL in production. |
 | `DEMO_MODE` | Enables replay fallback and demo seed behaviour. |
 | `ICPAC_BASE` | Base URL for public ICPAC source requests. |
 | `SNAPSHOT_TTL_MIN` | Cache lifetime before the source adapter refreshes a snapshot. |
 | `GEMINI_API_KEY` | Optional. When absent, assist controls are disabled and the workflow still works. |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to use cookie sessions. |
 | `COOKIE_SECURE` | Set to `true` behind HTTPS. |
+| `LINDA_BLOB_READ_WRITE_TOKEN` | Server-only token for the private Vercel Blob store used by generated exports. |
 | `LINDA_API_ORIGIN` | Server-only upstream URL used by the Vercel frontend proxy. |
 | `VITE_LINDA_API_ORIGIN` | Optional public frontend build-time API origin. Prefer the Vercel proxy for cookie-session deployments. |
 
-### Vercel frontend and hosted API
+### Vercel production deployment
 
-Vercel serves the React client but does not run the stateful SQLite API. Deploy `server/backend` as a long-running container with persistent storage, then set the Vercel project's production `LINDA_API_ORIGIN` to that HTTPS origin and redeploy the frontend. The included Vercel proxy keeps browser requests same-origin, including the session cookie. The API host must set `LINDA_SECRET`, `COOKIE_SECURE=true`, `PUBLIC_BASE_URL=https://linda-protocol.vercel.app`, and a persistent `DATABASE_URL`/volume. Do not use an ephemeral serverless filesystem for the workflow database or generated decision artifacts.
+The production deployment uses two Vercel projects. The React client is served at `linda-protocol.vercel.app`; its server-side proxy forwards `/api`, `/cap`, and `/integration` requests to the FastAPI project at `linda-protocol-api.vercel.app`. This keeps the HTTP-only session cookie on the frontend origin.
+
+The API project's root directory is `server/backend`. Its `api/index.py` entrypoint runs FastAPI as a Vercel Function, Neon Postgres holds workflow state, and private Vercel Blob holds generated exports. Configure the API project with `LINDA_SECRET`, `COOKIE_SECURE=true`, `PUBLIC_BASE_URL=https://linda-protocol.vercel.app`, `CORS_ORIGINS=https://linda-protocol.vercel.app`, `DATABASE_URL`, and `LINDA_BLOB_READ_WRITE_TOKEN`. Configure the frontend project with `LINDA_API_ORIGIN=https://linda-protocol-api.vercel.app`, then redeploy it after changing that value.
+
+The included `Dockerfile.vercel` remains available for container-based deployments. The function path uses a pure-Python PDF fallback if WeasyPrint's native rendering libraries are unavailable in the serverless runtime.
 
 ## Safety and limitations
 

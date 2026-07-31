@@ -16,6 +16,12 @@ The service listens on `http://127.0.0.1:8001`; internal interactive API documen
 
 WeasyPrint needs native Pango and Cairo libraries to render PDF packets. The Docker image installs them. For a macOS development environment, install Homebrew packages and set `DYLD_FALLBACK_LIBRARY_PATH` as described in the root README.
 
+## Vercel deployment
+
+Set the Vercel project's root directory to `server/backend`. The `api/index.py` module exports the FastAPI application for Vercel Functions; `vercel.json` routes the API, CAP, integration, and health paths to it. In production, use Neon Postgres through `DATABASE_URL` and private Vercel Blob through `LINDA_BLOB_READ_WRITE_TOKEN`; do not use the function filesystem for workflow state or exports.
+
+Set `LINDA_SECRET`, `COOKIE_SECURE=true`, `PUBLIC_BASE_URL=https://linda-protocol.vercel.app`, and `CORS_ORIGINS=https://linda-protocol.vercel.app`. The supplied `Dockerfile.vercel` is an alternative for a container-based Vercel deployment. PDF packet generation uses WeasyPrint when its native libraries are available and a portable ReportLab renderer otherwise.
+
 ## Demo data
 
 With `DEMO_MODE=true`, the API seeds fictional users and a Bungoma case at `ASSESSED` with a critical transport blocker. Every persona uses password `linda-demo`.
