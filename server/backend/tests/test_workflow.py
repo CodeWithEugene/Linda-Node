@@ -147,3 +147,49 @@ async def test_matcher_rejects_an_invented_card_id(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(assists, "_gemini", bad_matcher)
     with pytest.raises(assists.AssistUnavailable, match="card-id validation"):
         await assists.run_matcher(case)
+
+
+def test_replay_sources_can_assess_a_new_case() -> None:
+    reset_demo()
+    with TestClient(app) as client:
+        sign_in(client, "admin@demo")
+        assert client.post("/api/admin/replay-mode", json={"mode": "replay_only"}).status_code == 200
+        sign_in(client, "david.drm@demo")
+        source_status = client.get("/api/sources/status")
+        assert source_status.status_code == 200
+        snapshots = source_status.json()["sources"]
+        assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas"}
+        created = client.post("/api/cases", json={"title": "New replay assessment", "area_id": "KEN.3_1", "area_name": "Bungoma", "hazard": "drought"})
+        assert created.status_code == 201
+        case = created.json()
+        assessed = client.post(f"/api/cases/{case['id']}/assess", json={"snapshot_ids": [item["id"] for item in snapshots], "version": case["version"]})
+        assert assessed.status_code == 200, assessed.text
+        result = assessed.json()
+        assert result["state"] == "ASSESSED"
+        assert result["assessment"]["stage"] == "set"
+        assert result["assessment"]["eligible_action_cards"]
+        assert result["evidence"]
+
+
+def test_reassessment_supersedes_a_live_signature() -> None:
+    reset_demo()
+    with TestClient(app) as client:
+        sign_in(client, "admin@demo")
+        client.post("/api/admin/replay-mode", json={"mode": "replay_only"})
+        sign_in(client, "david.drm@demo")
+        sources = client.get("/api/sources/status").json()["sources"]
+        case = current_case(client)
+        for task_id in ("task_transport", "task_fodder"):
+            sign_in(client, "grace.ngo@demo")
+            task_case = current_case(client)
+            assert client.post(f"/api/cases/{CASE_ID}/tasks/{task_id}", json={"action": "resolve", "version": task_case["version"]}).status_code == 200
+        sign_in(client, "david.drm@demo")
+        case = current_case(client)
+        assert client.post(f"/api/cases/{CASE_ID}/transition", json={"to_state": "READY_FOR_REVIEW", "version": case["version"]}).status_code == 200
+        sign_in(client, "amina.ews@demo")
+        case = current_case(client)
+        assert client.post(f"/api/cases/{CASE_ID}/approvals", json={"decision": "approve", "version": case["version"]}).status_code == 200
+        reassessed = client.post(f"/api/cases/{CASE_ID}/evidence", json={"snapshot_ids": [sources[0]["id"]], "version": current_case(client)["version"]})
+        assert reassessed.status_code == 200, reassessed.text
+        assert reassessed.json()["state"] == "ASSESSED"
+        assert any(approval["superseded"] for approval in reassessed.json()["approvals"])

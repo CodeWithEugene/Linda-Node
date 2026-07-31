@@ -1,39 +1,42 @@
 # Security Policy
 
-Linda Node is an early-warning and anticipatory-action platform serving vulnerable communities in the Greater Horn of Africa. Security issues here are not just technical — a compromised alert channel, a spoofed trigger, or leaked user locations can cause real-world harm. We take reports seriously.
+Linda Protocol handles evidence, approval records, export artifacts, partner API credentials, and webhook configuration. Even in exercise mode, incorrect trust boundaries can mislead responders or expose sensitive operational information.
 
-## Supported Versions
+## Supported version
 
-| Version | Supported |
-|---|---|
-| `main` branch | ✅ |
-| Anything else | ❌ |
+Security fixes are applied to the latest `main` branch. Development branches and local demo databases are not supported release channels.
 
-The project is under active development for the [IGAD Hackathon 2026](https://igad-husika-hackathon.devpost.com/); only the latest `main` is supported.
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Do not open a public GitHub issue for a security vulnerability.
 
-**Please do not open a public GitHub issue for security vulnerabilities.**
+- Use **GitHub Security Advisories** for this repository: **Security → Report a vulnerability**.
+- Include the affected component, reproduction steps, impact, and any relevant request or response details.
+- Expect an acknowledgement within 72 hours and a status update within seven days.
 
-- Report privately via **GitHub Security Advisories**: *Security → Report a vulnerability* on this repository.
-- You should receive an acknowledgment within **72 hours** and a status update within **7 days**.
-- Please include: affected component (bot, API, dashboard, ingestion, financing module), reproduction steps, and impact assessment.
+Please allow a reasonable remediation window before publishing details. Good-faith security research is welcome.
 
-We ask for a reasonable disclosure window before publication so a fix can ship first. Good-faith research is welcome; we will not pursue action against researchers acting responsibly.
+## High-priority areas
 
-## Areas of Particular Sensitivity
+Report these as high priority:
 
-If you find issues in any of these, please flag them as high priority:
+1. **Authentication and roles**: bypassing session validation, role checks, login rate limiting, or administrator-only routes.
+2. **Decision integrity**: forging or modifying approvals, canonical digests, HMAC records, exports, or the hash-chained event log.
+3. **State-machine guards**: advancing a case with unresolved critical tasks, incomplete approvals, a stale version, or from a terminal state.
+4. **Partner credentials and webhooks**: exposing integration API keys or webhook secrets, bypassing API-key revocation/rate limits, or using webhooks for SSRF.
+5. **Source and export data**: leaking unredacted upstream personal data, secrets, or unsafe file paths through source snapshots, generated packets, CAP, offline bundles, or partner responses.
+6. **AI trust boundary**: prompt injection, schema bypass, or AI output that can mutate policy, tasks, approvals, exports, or case state.
 
-1. **User location data** — registered users share GPS pins. Any exposure of `users.location` or de-anonymization of community reports is a critical issue.
-2. **The Anticipatory Financing Module** — anything that lets an attacker forge, inflate, or bypass the Triangulation Engine (official trigger + community consensus + AI plausibility) to produce a fraudulent "Proof of Risk" dossier.
-3. **Alert integrity** — spoofing or tampering with proactive alerts (fake warnings erode community trust and can cause panic or dangerous inaction).
-4. **Telegram webhook authentication** — the webhook must validate Telegram's secret token; Mini App requests must validate `initData` per the [Telegram spec](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app).
-5. **Prompt injection** — community reports are untrusted input processed by LLMs. Reports must never be able to alter agent behavior, exfiltrate data, or influence alert content for other users.
-6. **Secrets** — no credentials, API keys, or `.env` files may ever be committed. If you find one in history, report it immediately.
+## Security expectations
 
-## Out of Scope
+- Keep `.env`, SQLite runtime databases, generated exports, and API keys out of Git.
+- Use a strong unique `LINDA_SECRET` outside local development.
+- Set `COOKIE_SECURE=true` and configure a narrow `CORS_ORIGINS` allowlist behind HTTPS.
+- Treat all source payloads and blocker reports as untrusted input.
+- Keep all public CAP and integration responses labelled `Exercise` until an authorised operational programme replaces the demo boundary.
 
-- Vulnerabilities in third-party platforms we depend on (Telegram, Supabase, Google Gemini, ICPAC platforms) — report those upstream.
-- Denial-of-service via volumetric traffic.
-- Issues requiring physical access to a user's unlocked device.
+## Out of scope
+
+- Vulnerabilities that require physical access to an unlocked device.
+- Volumetric denial-of-service attacks.
+- Security defects in third-party platforms, including ICPAC source systems, Husika services, Google Gemini, or GitHub. Report these to the relevant provider unless Linda Protocol is directly at fault.

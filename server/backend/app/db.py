@@ -7,10 +7,12 @@ surfaces. Events are intentionally only written through append_event().
 from __future__ import annotations
 
 import hashlib
+import json
 import secrets
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 try:
@@ -33,6 +35,23 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   signing_key TEXT NOT NULL,
   created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS source_snapshots (
+  id TEXT PRIMARY KEY,
+  adapter TEXT NOT NULL,
+  endpoint_url TEXT NOT NULL,
+  retrieved_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  payload_sha256 TEXT NOT NULL,
+  schema_ok INTEGER NOT NULL,
+  freshness TEXT NOT NULL,
+  logical_key TEXT NOT NULL,
+  meta_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS source_snapshots_lookup ON source_snapshots(logical_key, retrieved_at DESC);
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS decision_cases (
   id TEXT PRIMARY KEY,
@@ -224,6 +243,8 @@ def init_db() -> None:
         conn.executescript(SCHEMA)
         if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
             seed_demo(conn)
+        if not conn.execute("SELECT 1 FROM app_settings WHERE key = 'source_mode'").fetchone():
+            conn.execute("INSERT INTO app_settings (key,value) VALUES ('source_mode','live_first')")
 
 
 def seed_demo(conn: sqlite3.Connection) -> None:
@@ -247,6 +268,19 @@ def seed_demo(conn: sqlite3.Connection) -> None:
     policy_id = policy()["id"]
     cards = action_cards()
     case_id = "case_bungoma_ond2026"
+    created_at = now()
+    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "replay"
+    seeded_snapshots: dict[str, dict[str, Any]] = {}
+    for adapter, fixture_name in (("triggers", "triggers.json"), ("forecasts", "forecasts.json"), ("areas", "areas.json")):
+        payload = json.loads((fixture_root / fixture_name).read_text(encoding="utf-8"))
+        raw = canonical_json(payload)
+        snapshot_id = f"snap_seed_{adapter}"
+        seeded_snapshots[adapter] = {"id": snapshot_id, "payload": payload, "sha": sha256(raw)}
+        conn.execute(
+            """INSERT INTO source_snapshots (id,adapter,endpoint_url,retrieved_at,payload_json,payload_sha256,schema_ok,freshness,logical_key,meta_json)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (snapshot_id, adapter, f"fixtures/replay/{fixture_name}", created_at, raw, sha256(raw), 1, "replay", adapter, canonical_json({"mode": "replay_only", "synthetic": adapter != "areas"})),
+        )
     assessment = {
         "policy_version_id": policy_id, "stage": "set", "ndma_phase": "Alarm",
         "gates": [{"id": "source_freshness", "passed": True, "detail": "Replay snapshot recorded 2026-07-22"},
@@ -261,10 +295,9 @@ def seed_demo(conn: sqlite3.Connection) -> None:
         "compound_signals": ["drought", "flood"],
     }
     evidence = [
-        {"id": "snap_ond_2026", "kind": "forecast", "label": "OND 2026 return-period forecast", "adapter": "replay", "endpoint_url": "fixtures/replay_ond2026/forecast-set.json", "retrieved_at": "2026-07-22T10:00:00Z", "payload_sha256": sha256("ond-2026-set"), "freshness": "replay", "schema_ok": True},
-        {"id": "snap_bungoma_rule", "kind": "trigger_rule", "label": "Bungoma Triggers", "adapter": "replay", "endpoint_url": "fixtures/icpac/triggers-rules.json", "retrieved_at": "2026-07-22T10:00:00Z", "payload_sha256": sha256("bungoma-rule"), "freshness": "replay", "schema_ok": True},
+        {"id": seeded_snapshots["forecasts"]["id"], "kind": "forecast", "label": "OND 2026 return-period forecast", "adapter": "forecasts", "endpoint_url": "fixtures/replay/forecasts.json", "retrieved_at": created_at, "payload_sha256": seeded_snapshots["forecasts"]["sha"], "freshness": "replay", "schema_ok": True},
+        {"id": seeded_snapshots["triggers"]["id"], "kind": "trigger_rule", "label": "Bungoma Triggers", "adapter": "triggers", "endpoint_url": "fixtures/replay/triggers.json", "retrieved_at": created_at, "payload_sha256": seeded_snapshots["triggers"]["sha"], "freshness": "replay", "schema_ok": True},
     ]
-    created_at = now()
     conn.execute(
         """INSERT INTO decision_cases (id,area_id,area_name,hazard,title,state,policy_version_id,assessment_json,evidence_json,action_card_ids_json,stage,version,created_by,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -291,7 +324,7 @@ def seed_demo(conn: sqlite3.Connection) -> None:
 
 def reset_demo() -> None:
     with transaction() as conn:
-        for table in ("webhook_deliveries", "webhook_subscriptions", "integration_keys", "exports", "approvals", "readiness_tasks", "case_events", "decision_cases", "users"):
+        for table in ("webhook_deliveries", "webhook_subscriptions", "integration_keys", "exports", "approvals", "readiness_tasks", "case_events", "decision_cases", "source_snapshots", "users"):
             conn.execute(f"DELETE FROM {table}")
         seed_demo(conn)
 

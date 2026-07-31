@@ -20,6 +20,7 @@ from .domain import (
     sha256,
 )
 from .library import action_cards
+from .policy_engine import evaluate
 
 
 def _not_found() -> HTTPException:
@@ -341,4 +342,38 @@ def create_case(conn: sqlite3.Connection, actor: dict[str, Any], area_id: str, a
         (case_id, area_id, area_name, hazard, title, canonical_json(evidence or []), canonical_json(card_ids), actor["id"], created, created),
     )
     append_event(conn, case_id, actor["id"], "CASE_CREATED", {"title": title, "area_id": area_id, "hazard": hazard})
+    return get_case(conn, case_id)
+
+
+def attach_evidence_and_assess(
+    conn: sqlite3.Connection, case_id: str, actor: dict[str, Any], snapshots: list[dict[str, Any]], supplied_version: int | None = None,
+) -> dict[str, Any]:
+    """Persist selected immutable snapshots, then deterministically re-assess.
+
+    The caller has already authorisation-checked the actor.  Snapshots are
+    copied as compact provenance records, preserving a case even if a source
+    adapter later refreshes or disappears.
+    """
+    case = get_case(conn, case_id)
+    if case["state"] in TERMINAL_STATES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Terminal cases cannot be re-assessed")
+    if supplied_version is not None:
+        _require_version(conn, case, supplied_version, actor["id"])
+    merged = {item.get("id"): item for item in case["evidence"]}
+    for snapshot in snapshots:
+        merged[snapshot["id"]] = {
+            "id": snapshot["id"], "kind": "forecast" if snapshot["adapter"] == "forecasts" else "trigger_event" if snapshot["adapter"] == "triggers" else "area",
+            "label": f"{snapshot['adapter'].replace('_', ' ').title()} snapshot",
+            "adapter": snapshot["adapter"], "endpoint_url": snapshot["endpoint_url"], "retrieved_at": snapshot["retrieved_at"],
+            "payload_sha256": snapshot["payload_sha256"], "freshness": snapshot["freshness"], "schema_ok": bool(snapshot["schema_ok"]),
+        }
+    evidence = list(merged.values())
+    assessment = evaluate(snapshots, case["hazard"])
+    if case["state"] in {"READY_FOR_REVIEW", "NEEDS_EVIDENCE"}:
+        supersede_approvals_for_reassessment(conn, case_id, actor["id"])
+    next_state = "ASSESSED"
+    version = _bump_case(conn, case, state=next_state)
+    conn.execute("UPDATE decision_cases SET assessment_json = ?, evidence_json = ?, policy_version_id = ?, stage = ?, version = ? WHERE id = ?", (canonical_json(assessment), canonical_json(evidence), assessment["policy_version_id"], assessment["stage"], version, case_id))
+    materialize_readiness_tasks(conn, case_id, assessment["eligible_action_cards"], actor["id"])
+    append_event(conn, case_id, actor["id"], "ASSESSED", {"from": case["state"], "stage": assessment["stage"], "gates_passed": all(gate["passed"] for gate in assessment["gates"]), "snapshot_ids": [item["id"] for item in snapshots]})
     return get_case(conn, case_id)

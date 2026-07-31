@@ -21,3 +21,7 @@ server/backend/*.egg-info/
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
+
+# Local planning and research notes
+what-to-build.md
+research.md

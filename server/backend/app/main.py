@@ -18,6 +18,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import assists
@@ -51,6 +52,7 @@ from .integration import (
 )
 from .library import action_cards, policy
 from .services import (
+    attach_evidence_and_assess,
     case_events,
     case_summary,
     create_case,
@@ -62,6 +64,8 @@ from .services import (
     verify_approvals,
     verify_event_chain,
 )
+from .sources import areas as source_areas
+from .sources import get_snapshot, list_snapshots, refresh_all, set_source_mode, signals, source_mode
 
 
 class LoginInput(BaseModel):
@@ -120,6 +124,15 @@ class StopTriggerInput(BaseModel):
     observed_probability: float = Field(default=0.22, ge=0, le=1)
 
 
+class EvidenceInput(BaseModel):
+    snapshot_ids: list[str] = Field(min_length=1)
+    version: int | None = None
+
+
+class SourceModeInput(BaseModel):
+    mode: str
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
@@ -174,6 +187,43 @@ def me(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     return user
 
 
+@app.get("/api/sources/status")
+def sources_status(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    with transaction() as conn:
+        snapshots = refresh_all(conn)
+        return {"mode": source_mode(conn), "sources": [{key: item[key] for key in ("id", "adapter", "endpoint_url", "retrieved_at", "payload_sha256", "schema_ok", "freshness", "meta")} for item in snapshots]}
+
+
+@app.post("/api/sources/refresh")
+def sources_refresh(_: dict[str, Any] = Depends(require_role("county_drm_officer", "ews_specialist", "admin"))) -> dict[str, Any]:
+    with transaction() as conn:
+        snapshots = refresh_all(conn, force=True)
+        return {"mode": source_mode(conn), "snapshot_ids": [item["id"] for item in snapshots]}
+
+
+@app.get("/api/sources/snapshots")
+def source_snapshots(adapter: str | None = None, limit: int = Query(50, ge=1, le=100), _: dict[str, Any] = Depends(current_user)) -> list[dict[str, Any]]:
+    with connection() as conn:
+        return [{**item, "payload": {"available": True, "keys": list(item["payload"].keys())}} for item in list_snapshots(conn, adapter, limit)]
+
+
+@app.get("/api/sources/snapshots/{snapshot_id}")
+def source_snapshot(snapshot_id: str, _: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    with connection() as conn:
+        try: return get_snapshot(conn, snapshot_id)
+        except KeyError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Source snapshot not found") from exc
+
+
+@app.get("/api/signals")
+def signal_inbox(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    with transaction() as conn: return signals(conn)
+
+
+@app.get("/api/areas")
+def areas(country: str | None = None, level: int | None = None, _: dict[str, Any] = Depends(current_user)) -> list[dict[str, Any]]:
+    with transaction() as conn: return source_areas(conn, country, level)
+
+
 @app.get("/api/cases")
 def cases(state: str | None = None, area: str | None = None, _: dict[str, Any] = Depends(current_user)) -> list[dict[str, Any]]:
     with connection() as conn:
@@ -193,6 +243,22 @@ def create_case_route(payload: CaseInput, user: dict[str, Any] = Depends(require
 @app.get("/api/cases/{case_id}")
 def case_detail(case_id: str, _: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     with connection() as conn: return get_case(conn, case_id)
+
+
+@app.post("/api/cases/{case_id}/evidence")
+def attach_evidence(case_id: str, payload: EvidenceInput, user: dict[str, Any] = Depends(require_role("county_drm_officer", "ews_specialist"))) -> dict[str, Any]:
+    with transaction() as conn:
+        try: snapshots = [get_snapshot(conn, snapshot_id) for snapshot_id in payload.snapshot_ids]
+        except KeyError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Source snapshot not found") from exc
+        return attach_evidence_and_assess(conn, case_id, user, snapshots, payload.version)
+
+
+@app.post("/api/cases/{case_id}/assess")
+def assess(case_id: str, payload: EvidenceInput, user: dict[str, Any] = Depends(require_role("county_drm_officer"))) -> dict[str, Any]:
+    with transaction() as conn:
+        try: snapshots = [get_snapshot(conn, snapshot_id) for snapshot_id in payload.snapshot_ids]
+        except KeyError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Source snapshot not found") from exc
+        return attach_evidence_and_assess(conn, case_id, user, snapshots, payload.version)
 
 
 @app.post("/api/cases/{case_id}/tasks/{task_id}")
@@ -238,10 +304,12 @@ def assist(case_id: str, assist_name: str, payload: AssistInput, user: dict[str,
     try:
         if assist_name == "matcher":
             result = asyncio.run(assists.run_matcher(case))
+        elif assist_name == "explainer":
+            result = asyncio.run(assists.run_explainer(case))
         elif assist_name == "blockers" and payload.report:
             result = asyncio.run(assists.run_blocker(payload.report))
         else:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Supported assists are matcher and blockers; blockers requires report text")
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Supported assists are explainer, matcher, and blockers; blockers requires report text")
     except assists.AssistUnavailable as exc:
         with transaction() as conn:
             append_event(conn, case_id, f"assist:{assist_name}", "ASSIST_FAILED", {"reason": str(exc)})
@@ -343,6 +411,13 @@ def remove_webhook(webhook_id: str, _: dict[str, Any] = Depends(require_role("ad
 def seed(_: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, str]: reset_demo(); return {"status": "seeded"}
 
 
+@app.post("/api/admin/replay-mode")
+def replay_mode(payload: SourceModeInput, _: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, str]:
+    try:
+        with transaction() as conn: return {"mode": set_source_mode(conn, payload.mode)}
+    except ValueError as exc: raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
 @app.post("/api/admin/simulate-stop-trigger")
 def simulate_stop_trigger(payload: StopTriggerInput, background: BackgroundTasks, _: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, Any]:
     with transaction() as conn:
@@ -410,3 +485,8 @@ def integration_activation_schema() -> dict[str, Any]:
 @app.get("/integration/v1/docs", response_class=HTMLResponse)
 def integration_docs() -> str:
     return """<!doctype html><title>Linda Protocol integration API</title><main style='font:16px system-ui;max-width:750px;margin:48px auto'><h1>Linda Protocol integration API · v1</h1><p>Exercise-only, read-only partner interface. Human approval remains inside Linda Protocol.</p><ul><li><code>GET /cap/feed.xml</code>, <code>/integration/v1/openapi.json</code>, and <code>/integration/v1/schemas/activation.json</code> are public.</li><li><code>GET /integration/v1/activations</code> requires a bearer API key and supports <code>limit</code> (1–100) and opaque <code>cursor</code> pagination.</li><li>Each payload includes hashes, signature verification, <code>mode: exercise</code>, and a disclaimer.</li><li>Webhook subscription management is authenticated with an in-app administrator session; delivery uses signed raw JSON with retry backoff.</li></ul><p>Breaking changes will use <code>/v2</code>.</p></main>"""
+
+
+static_root = Path("/app/static")
+if static_root.is_dir():
+    app.mount("/", StaticFiles(directory=static_root, html=True), name="web")

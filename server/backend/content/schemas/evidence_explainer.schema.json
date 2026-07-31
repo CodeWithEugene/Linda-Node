@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Linda Protocol Evidence Explainer v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "cited_snapshot_ids", "missing_inputs"],
+  "properties": {
+    "summary": {"type": "string", "minLength": 1, "maxLength": 1500},
+    "cited_snapshot_ids": {"type": "array", "items": {"type": "string"}},
+    "missing_inputs": {"type": "array", "items": {"type": "string", "maxLength": 300}}
+  }
+}

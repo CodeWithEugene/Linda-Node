@@ -65,6 +65,14 @@ async def run_matcher(case: dict[str, Any]) -> dict[str, Any]:
     return {"candidates": candidates, "disclaimer": "AI ranking is descriptive only; deterministic eligibility remains authoritative."}
 
 
+async def run_explainer(case: dict[str, Any]) -> dict[str, Any]:
+    snapshot_ids = {item["id"] for item in case["evidence"]}
+    result = await _gemini("explainer", {"assessment": case["assessment"], "evidence": [{"id": item["id"], "label": item["label"], "hash": item["payload_sha256"]} for item in case["evidence"]]})
+    if any(item not in snapshot_ids for item in result.get("cited_snapshot_ids", [])):
+        raise AssistUnavailable("Evidence Explainer cited an unknown snapshot")
+    return result
+
+
 async def run_blocker(report: str) -> dict[str, Any]:
     result = await _gemini("blockers", {"field_report": report, "taxonomy": sorted(BLOCKER_CODES)})
     if result.get("code") not in BLOCKER_CODES or result.get("severity") not in {"critical", "normal"}:

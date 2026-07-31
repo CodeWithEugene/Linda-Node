@@ -24,6 +24,8 @@ const AuditPage = lazy(() => import('./pages').then((module) => ({ default: modu
 const CaseDetailPage = lazy(() => import('./pages').then((module) => ({ default: module.CaseDetailPage })))
 const CasesPage = lazy(() => import('./pages').then((module) => ({ default: module.CasesPage })))
 const LibraryPage = lazy(() => import('./pages').then((module) => ({ default: module.LibraryPage })))
+const InboxPage = lazy(() => import('./pages').then((module) => ({ default: module.InboxPage })))
+const SourcesPage = lazy(() => import('./pages').then((module) => ({ default: module.SourcesPage })))
 const PlaceholderPage = lazy(() => import('./pages').then((module) => ({ default: module.PlaceholderPage })))
 
 type Session = { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<void>; logout: () => Promise<void> }
@@ -55,10 +57,10 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
   if (loading) return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Loading session" /></Box>
   if (!user) return <Suspense fallback={<PageFallback />}><Routes><Route path="/login" element={<LoginPage />} /><Route path="*" element={<Navigate to="/login" replace />} /></Routes></Suspense>
   return <Shell {...props}><Suspense fallback={<PageFallback />}><Routes>
-    <Route path="/" element={<PlaceholderPage title="Signal Inbox" body="Source ingestion, evidence views, and the map are integrated from the Person 1 boundary. Use Decision Cases to work through the readiness, co-signing, export, and audit workflow." />} />
+    <Route path="/" element={<InboxPage />} />
     <Route path="/cases" element={<CasesPage />} /><Route path="/cases/:caseId" element={<CaseDetailPage />} />
     <Route path="/audit" element={<AuditPage />} /><Route path="/library" element={<LibraryPage />} />
-    <Route path="/sources" element={<PlaceholderPage title="Sources" body="Source adapter status and snapshots are provided by the Person 1 ingestion boundary." />} />
+    <Route path="/sources" element={<SourcesPage />} />
     <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
     <Route path="*" element={<Navigate to="/cases" replace />} />
   </Routes></Suspense></Shell>

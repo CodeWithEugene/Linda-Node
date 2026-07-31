@@ -17,6 +17,9 @@ class Settings:
     cors_origins: list[str]
     public_base_url: str
     cookie_secure: bool
+    icpac_base: str
+    http_timeout_s: float
+    snapshot_ttl_min: int
 
 
 def _database_path(database_url: str) -> Path:
@@ -34,9 +37,18 @@ def get_settings() -> Settings:
         demo_mode=os.getenv("DEMO_MODE", "true").lower() == "true",
         gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        cors_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")],
+        cors_origins=[
+            origin.strip()
+            for origin in os.getenv(
+                "CORS_ORIGINS",
+                "http://127.0.0.1:5173,http://localhost:5173",
+            ).split(",")
+        ],
         public_base_url=os.getenv("PUBLIC_BASE_URL", "http://localhost:8000"),
         cookie_secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+        icpac_base=os.getenv("ICPAC_BASE", "https://eatriggersthresholds.icpac.net").rstrip("/"),
+        http_timeout_s=float(os.getenv("HTTP_TIMEOUT_S", "8")),
+        snapshot_ttl_min=int(os.getenv("SNAPSHOT_TTL_MIN", "30")),
     )
 
 

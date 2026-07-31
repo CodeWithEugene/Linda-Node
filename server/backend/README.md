@@ -1,33 +1,67 @@
 # Linda Protocol API
 
-Person 2's FastAPI service owns authentication, action readiness, co-signing,
-audit, exports, the partner API, and constrained action/blocker assists.
+The FastAPI service owns the exercise workflow: authentication, source snapshots, deterministic policy assessment, readiness tasks, multi-role approvals, audit events, exports, and the partner-facing integration API.
+
+## Run locally
 
 ```bash
 cd server/backend
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
+cp .env.example .env
 .venv/bin/uvicorn app.main:app --reload --port 8001
 ```
 
-The service auto-seeds fictional demo users in `DEMO_MODE`. Every persona's
-password is `linda-demo`:
+The service listens on `http://127.0.0.1:8001`; internal interactive API documentation is at `http://127.0.0.1:8001/docs`.
 
-- `amina.ews@demo` — Evidence & EWS Specialist
-- `david.drm@demo` — County DRM Officer
-- `grace.ngo@demo` — NGO & Finance Lead
-- `observer@demo` — read only
-- `admin@demo` — seed recovery, partner keys, and webhooks
+WeasyPrint needs native Pango and Cairo libraries to render PDF packets. The Docker image installs them. For a macOS development environment, install Homebrew packages and set `DYLD_FALLBACK_LIBRARY_PATH` as described in the root README.
 
-The seed starts with a Bungoma case at `ASSESSED` and a critical transport
-blocker. Resolve it as Grace, send for review as David, then approve as Amina,
-David, and Grace to exercise all four exports and the integration API.
+## Demo data
 
-`GET /docs` provides the internal API contract. `GET /integration/v1/docs` and
-`GET /cap/feed.xml` are the public partner surfaces. All are explicitly marked
-`mode: exercise`; nothing sends alerts or moves funds.
+With `DEMO_MODE=true`, the API seeds fictional users and a Bungoma case at `ASSESSED` with a critical transport blocker. Every persona uses password `linda-demo`.
 
-The Husika payload is validated locally against the vendored live OpenAPI
-snapshot in `fixtures/husika_openapi/`. Its source URL, retrieval time, and
-SHA-256 are recorded in the adjacent metadata file. Refresh the pair together
-when Husika publishes a new contract.
+| Email | Role |
+|---|---|
+| `amina.ews@demo` | EWS Specialist |
+| `david.drm@demo` | County DRM Officer |
+| `grace.ngo@demo` | NGO & Finance Lead |
+| `observer@demo` | Read-only observer |
+| `admin@demo` | Demo recovery, source-mode, partner-key, and webhook administrator |
+
+The demo also seeds replay snapshots for triggers, forecasts, and areas. An administrator can restore the scenario with `POST /api/admin/seed` or switch between `live_first` and `replay_only` with `POST /api/admin/replay-mode`.
+
+## Key API groups
+
+| Route group | Purpose |
+|---|---|
+| `/api/auth/*`, `/api/me` | Cookie-session authentication and current identity. |
+| `/api/sources/*`, `/api/signals`, `/api/areas` | Source status, immutable snapshots, refresh, signal inbox, and area records. |
+| `/api/cases/*` | Case creation, assessment, evidence attachment, tasks, transitions, approvals, assists, exports, and audit verification. |
+| `/api/library/*` | Read-only policy, action-card, and Husika-contract material. |
+| `/api/admin/*` | Demo recovery, source mode, integration keys, and webhooks. |
+| `/integration/v1/*` | Versioned, read-only partner records and integrity verification. |
+| `/cap/feed.xml` | Public Exercise CAP Atom feed. |
+
+Errors use the shape `{"error": {"code", "message", "detail"}}`. Case mutations require the current case version and return HTTP 409 for stale writes.
+
+## Source and assessment behaviour
+
+Each source response is stored with raw JSON, retrieval time, SHA-256, validation state, and freshness. The source adapter supports live-first retrieval with cached, stale, or replay fallback. The deterministic policy engine evaluates only persisted snapshots and versioned action-card YAML. It does not use Gemini.
+
+When new evidence re-assesses a case, existing approvals are retained but marked superseded. The case returns to `ASSESSED` and must be reviewed and signed again.
+
+## Integration contract
+
+`GET /integration/v1/docs` describes the public partner surface. API-key-protected activation records include provenance, approvals, exports, and integrity verification. CAP documents, Husika payloads, and all partner responses are labelled `Exercise`.
+
+Husika payloads are validated locally against `fixtures/husika_openapi/ingestor.openapi.json`. The API does not call Husika write endpoints.
+
+## Verify
+
+```bash
+cd server/backend
+.venv/bin/ruff check app tests
+.venv/bin/pytest -q
+```
+
+The test suite covers workflow guards, exports, partner verification, source-backed assessment, reassessment, and constrained-assist validation.

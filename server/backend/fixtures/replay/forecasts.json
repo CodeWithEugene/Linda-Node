@@ -1,0 +1,3 @@
+{
+  "forecasts": [{"id": "ond_2026_bungoma", "name": "OND 2026 drought probability", "area_id": "KEN.3_1", "area_name": "Bungoma", "hazard": "drought", "indicator": "spi3_chirps_forecast", "probability": 0.52, "quantile": 0.33, "lead_months": 3, "valid_date": "2026-10-01", "severity": "moderate"}]
+}
