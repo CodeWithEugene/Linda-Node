@@ -8,7 +8,7 @@ type Signal = { area_id: string; severity?: string; name: string }
 type MapPosition = { coordinates: [number, number]; zoom: number }
 
 const kenyaCenter: [number, number] = [37.9, 0.2]
-const viewportCenter: [number, number] = [0, 0]
+export const initialMapPosition: MapPosition = { coordinates: kenyaCenter, zoom: 5 }
 
 const severityColor = (severity = '') => {
   const normalized = severity.toLowerCase()
@@ -29,7 +29,7 @@ export const areaCentroid = (geometry: GeoJSON.Geometry): [number, number] | nul
 }
 
 export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signals: Signal[]; onAreaSelect?: (area: Area) => void }) {
-  const [position, setPosition] = useState<MapPosition>({ coordinates: viewportCenter, zoom: 5 })
+  const [position, setPosition] = useState<MapPosition>(initialMapPosition)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const affectedAreas = useMemo(() => areas.flatMap((area) => {
     const coordinates = areaCentroid(area.geometry)
@@ -39,7 +39,7 @@ export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signa
     return [{ area, coordinates, color: severityColor(topSeverity), signalCount: areaSignals.length }]
   }), [areas, signals])
 
-  const resetView = () => setPosition({ coordinates: viewportCenter, zoom: 5 })
+  const resetView = () => setPosition(initialMapPosition)
   return <Box sx={{ position: 'relative', height: 300, borderRadius: 1, overflow: 'hidden', bgcolor: '#e8f0ed', border: 1, borderColor: 'divider' }}>
     <ComposableMap aria-label="Interactive affected areas map" width={800} height={460} projection="geoMercator" projectionConfig={{ center: kenyaCenter, scale: 1450 }} style={{ width: '100%', height: '100%' }}>
       <ZoomableGroup center={position.coordinates} zoom={position.zoom} minZoom={3} maxZoom={12} onMoveEnd={({ coordinates, zoom }) => setPosition({ coordinates, zoom })}>
