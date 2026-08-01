@@ -27,7 +27,7 @@
 
 **Screen:** the landing page, before beginning the main story.
 
-> "Before we get into the workflow, the two controls in the lower-right keep the workspace usable for more people. The chat icon opens Linda Guide: ask how the workspace handles evidence, cases, approvals, sources, and accessibility. It gives bounded product guidance rather than operational or emergency advice."
+> "Before we get into the workflow, the two controls in the lower-right keep the workspace usable for more people. The upper chat icon opens Linda Guide directly above the button: ask how the workspace handles evidence, cases, approvals, sources, and accessibility. It uses curated product knowledge and gives bounded product guidance rather than operational or emergency advice."
 
 *(Click the chat icon, ask “How do approvals work?”, then close it.)*
 

@@ -437,7 +437,7 @@ It also runs daily and on `workflow_dispatch` in CI.
 
 ## 15. Scope, limits, and safety
 
-- **Deliberately out of scope:** Telegram or SMS/USSD delivery, a chatbot, any climate or hazard model of our own, automatic fund disbursement, beneficiary selection, automatic public alerting, and live calls to Husika write APIs.
+- **Deliberately out of scope:** Telegram or SMS/USSD delivery, any climate or hazard model of our own, automatic fund disbursement, beneficiary selection, automatic public alerting, and live calls to Husika write APIs. Linda Guide provides curated workspace help only; it is not an operational or emergency advisor.
 - **The demo policies are illustrative.** Thresholds, costs, and effectiveness values are team-authored and are *not* official ICPAC, NDMA, county-government, or financing-partner policy. Every policy file states this, and the disclaimer appears in the UI and in every packet.
 - **Tranche lines are recommendations.** "Release" is a recorded recommendation requiring the human approvals on record. Linda Node moves no money and says so wherever money appears.
 - **Signing is integrity protection within this system.** Server-held keys, HMAC-SHA256 — a *cryptographically signed decision record*, not PKI, not digital signatures in the legal sense, not a blockchain.

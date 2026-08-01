@@ -14,11 +14,13 @@ import Fab from '@mui/material/Fab'
 import FormControlLabel from '@mui/material/FormControlLabel'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
+import Popover from '@mui/material/Popover'
 import Stack from '@mui/material/Stack'
 import Switch from '@mui/material/Switch'
 import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
+import { answerGuideQuestion } from './chatbotKnowledge'
 
 type AccessibilityPreference = 'large-text' | 'high-contrast' | 'reduce-motion'
 
@@ -35,27 +37,7 @@ const QUICK_QUESTIONS = [
   'What data is used?',
 ]
 
-/** A transparent, local guide: it never fabricates operational guidance. */
-export function answerGuideQuestion(question: string): string {
-  const text = question.trim().toLowerCase()
-  if (!text) return 'Please enter a question and I’ll point you to the relevant part of Linda Node.'
-  if (/(approve|approval|sign|review)/.test(text)) {
-    return 'Open a decision case and use the Approvals tab. A case moves to review only after its critical readiness tasks are resolved; the required roles then record their approvals against the same evidence digest.'
-  }
-  if (/(data|source|evidence|icpac|forecast)/.test(text)) {
-    return 'Use Sources to inspect the recorded ICPAC inputs and their freshness. In each case, the Evidence tab shows the exact snapshots and provenance used for the assessment. Replay and synthetic evidence are always labelled.'
-  }
-  if (/(case|readiness|action|stage)/.test(text)) {
-    return 'Regional Readiness shows the current assessment across the region. Open a row to see its decision case, then use Actions & Readiness to review which pre-agreed actions fit the stage and available lead time.'
-  }
-  if (/(accessib|screen reader|keyboard|contrast|motion|text size)/.test(text)) {
-    return 'Select the accessibility button below to enlarge text, increase contrast, or reduce motion. The workspace is also designed for keyboard navigation and screen readers.'
-  }
-  if (/(what.*linda|what.*this|how.*work|purpose)/.test(text)) {
-    return 'Linda Node turns an evidence-backed readiness signal into a governed decision case. It records the evidence, action readiness, required approvals, exports, and audit trail; it does not issue public alerts or move funds.'
-  }
-  return 'I can help with how Linda Node uses readiness signals, evidence, cases, approvals, actions, sources, and accessibility. For a specific decision, open the relevant case so you can review its evidence trace and audit record.'
-}
+export { answerGuideQuestion } from './chatbotKnowledge'
 
 function preferenceKey(preference: AccessibilityPreference) {
   return `linda-${preference}`
@@ -114,6 +96,7 @@ function Chatbot() {
   const [question, setQuestion] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME])
   const inputRef = useRef<HTMLInputElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 0)
@@ -130,19 +113,27 @@ function Chatbot() {
   return (
     <>
       <Tooltip title="Ask Linda Guide" placement="left">
-        <Fab color="primary" size="medium" onClick={() => setOpen(true)} aria-label="Open Linda Guide">
+        <Fab ref={triggerRef} color="primary" size="medium" onClick={() => setOpen(true)} aria-label="Open Linda Guide" aria-expanded={open} aria-haspopup="dialog">
           <ChatBubbleOutline />
         </Fab>
       </Tooltip>
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="sm" aria-labelledby="linda-guide-title">
-        <DialogTitle id="linda-guide-title" sx={{ pr: 7 }}>
+      <Popover
+        open={open}
+        anchorEl={triggerRef.current}
+        onClose={() => setOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        slotProps={{ paper: { sx: { width: { xs: 'calc(100vw - 32px)', sm: 440 }, maxHeight: 'min(620px, calc(100vh - 104px))', borderRadius: 2, overflow: 'hidden' } } }}
+      >
+        <Box role="dialog" aria-modal="true" aria-labelledby="linda-guide-title" sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
+        <DialogTitle id="linda-guide-title" sx={{ pr: 7, py: 1.5 }}>
           Linda Guide
           <IconButton onClick={() => setOpen(false)} aria-label="Close Linda Guide" sx={{ position: 'absolute', right: 12, top: 10 }}><Close /></IconButton>
         </DialogTitle>
-        <DialogContent dividers>
+        <Box sx={{ borderTop: 1, borderBottom: 1, borderColor: 'divider', maxHeight: 345, overflowY: 'auto', p: 2 }}>
           <Stack spacing={1.25} aria-live="polite" aria-label="Linda Guide conversation">
             {messages.map((message, index) => (
-              <Paper key={`${message.from}-${index}`} variant="outlined" sx={{ p: 1.25, alignSelf: message.from === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', bgcolor: message.from === 'user' ? 'primary.main' : 'background.paper', color: message.from === 'user' ? 'primary.contrastText' : 'text.primary' }}>
+              <Paper key={`${message.from}-${index}`} elevation={0} sx={{ p: 1.25, alignSelf: message.from === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', bgcolor: message.from === 'user' ? 'primary.dark' : 'grey.100', color: message.from === 'user' ? 'primary.contrastText' : 'text.primary', border: 1, borderColor: message.from === 'user' ? 'primary.dark' : 'divider' }}>
                 <Typography variant="body2">{message.text}</Typography>
               </Paper>
             ))}
@@ -152,13 +143,14 @@ function Chatbot() {
               {QUICK_QUESTIONS.map((item) => <Button key={item} variant="outlined" onClick={() => ask(item)}>{item}</Button>)}
             </Stack>
           )}
-          <Alert severity="info" sx={{ mt: 2 }}>Linda Guide provides workspace help, not emergency advice or operational decisions.</Alert>
-        </DialogContent>
-        <Box component="form" onSubmit={submit} sx={{ display: 'flex', gap: 1, p: 2 }}>
+        </Box>
+        <Alert severity="info" sx={{ m: 1.5 }}>Workspace guidance only—not emergency or operational advice.</Alert>
+        <Box component="form" onSubmit={submit} sx={{ display: 'flex', gap: 1, px: 2, pb: 2 }}>
           <TextField inputRef={inputRef} fullWidth label="Ask a question" value={question} onChange={(event) => setQuestion(event.target.value)} />
           <IconButton color="primary" type="submit" disabled={!question.trim()} aria-label="Send question"><Send /></IconButton>
         </Box>
-      </Dialog>
+        </Box>
+      </Popover>
     </>
   )
 }
@@ -167,8 +159,8 @@ export function AssistTools() {
   return (
     <Box sx={{ position: 'fixed', right: { xs: 16, sm: 24 }, bottom: { xs: 16, sm: 24 }, zIndex: (theme) => theme.zIndex.modal - 1 }}>
       <Stack spacing={1} alignItems="flex-end">
-        <AccessibilityControls />
         <Chatbot />
+        <AccessibilityControls />
       </Stack>
     </Box>
   )
