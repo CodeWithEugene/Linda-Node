@@ -28,6 +28,27 @@ def test_reset_demo_initializes_a_fresh_database(tmp_path, monkeypatch: pytest.M
         assert conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"] == 5
 
 
+def test_reset_demo_migrates_an_existing_database(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    database_path = tmp_path / "legacy-linda.db"
+    fresh_settings = replace(
+        db.settings,
+        database_url=f"sqlite:///{database_path}",
+        database_path=database_path,
+        database_engine="sqlite",
+    )
+    monkeypatch.setattr(db, "settings", fresh_settings)
+
+    with db.connection() as conn:
+        conn.executescript(db.SCHEMA.replace("  payload_raw TEXT,\n", ""))
+        conn.commit()
+
+    reset_demo()
+
+    with connection() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(source_snapshots)")}
+        assert "payload_raw" in columns
+
+
 def sign_in(client: TestClient, email: str) -> None:
     response = client.post("/api/auth/login", json={"email": email, "password": "linda-demo"})
     assert response.status_code == 200, response.text

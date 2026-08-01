@@ -7,6 +7,10 @@ export type ExportRecord = { id: string; kind: string; sha256: string; generated
 export type DecisionCase = { id: string; area_id: string; area_name: string; hazard: string; title: string; state: string; stage?: string | null; version: number; policy_version_id: string; assessment: { ndma_phase?: string | null; recommendation?: string; synthetic_observation?: boolean; observed_signal?: { probability?: number | null; quantile?: number | null; lead_months?: number | null; source?: string | null; synthetic?: boolean; adapter?: string; freshness?: string }; stop_trigger?: { armed: boolean; condition: string; indicator?: string; observed?: number | null; fired: boolean; last_checked?: string }; gates?: { id: string; passed: boolean; detail: string }[]; stage_trace?: { stage: string; condition: string; observed: number | null; detail?: string; passed: boolean }[]; compound_signals?: string[]; eligible_action_cards?: string[]; ineligible?: { card: string; reason: string }[]; cost_loss?: Record<string, unknown> }; evidence: { id: string; kind: string; label: string; endpoint_url: string; payload_sha256: string; freshness: string }[]; action_cards: ActionCard[]; tasks: Task[]; approvals: Approval[]; exports: ExportRecord[]; created_at: string; updated_at: string }
 
 type ApiError = { error?: { message?: string; detail?: unknown } }
+export type ApiRequestInit = RequestInit & { timeoutMs?: number }
+
+const DEFAULT_API_TIMEOUT_MS = 12_000
+export const AI_ASSIST_TIMEOUT_MS = 30_000
 
 const apiOrigin = (import.meta.env.VITE_LINDA_API_ORIGIN || '').trim().replace(/\/+$/, '')
 
@@ -14,18 +18,19 @@ function apiUrl(path: string): string {
   return apiOrigin ? `${apiOrigin}${path}` : path
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
+  const { timeoutMs = DEFAULT_API_TIMEOUT_MS, signal: callerSignal, ...requestInit } = init
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 12_000)
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   const abortFromCaller = () => controller.abort()
-  init.signal?.addEventListener('abort', abortFromCaller, { once: true })
+  callerSignal?.addEventListener('abort', abortFromCaller, { once: true })
 
   let response: Response
   try {
     response = await fetch(apiUrl(path), {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
-      ...init,
+      headers: { 'Content-Type': 'application/json', ...(requestInit.headers ?? {}) },
+      ...requestInit,
       signal: controller.signal,
     })
   } catch (error) {
@@ -35,7 +40,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw error
   } finally {
     window.clearTimeout(timeout)
-    init.signal?.removeEventListener('abort', abortFromCaller)
+    callerSignal?.removeEventListener('abort', abortFromCaller)
   }
 
   if (!response.ok) {
@@ -46,5 +51,6 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export const post = <T>(path: string, body?: unknown) => api<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
+export const post = <T>(path: string, body?: unknown, init?: ApiRequestInit) =>
+  api<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 export const del = <T>(path: string) => api<T>(path, { method: 'DELETE' })

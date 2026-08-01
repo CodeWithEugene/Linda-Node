@@ -107,6 +107,10 @@
 
 > "Every operand is labelled: green is an official source, amber is an assumption written into the reviewed policy file. Nothing is unattributed."
 
+*(In the **AI evidence explanation** panel, click **Run explainer** and wait for the grounded response.)*
+
+> "The explainer reads only this recorded evidence trace and returns the snapshot IDs it cited. It has a 30-second response window because NVIDIA may retry a malformed structured response once; it is still advisory and cannot change policy, gates, approvals, tasks, or the case state."
+
 *(Click **Actions & Readiness**.)*
 
 > "Three action cards are eligible. Seed distribution is **not** — it needs 120 days of lead time and we have 90. The engine says exactly why."

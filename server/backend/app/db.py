@@ -461,6 +461,7 @@ def reset_demo() -> None:
         # new database. Create the schema before clearing rows so a clean CI
         # checkout does not depend on an earlier application startup.
         conn.executescript(POSTGRES_SCHEMA if settings.database_engine == "postgres" else SCHEMA)
+        _migrate(conn)
         for table in ("webhook_deliveries", "webhook_subscriptions", "integration_keys", "exports", "approvals", "readiness_tasks", "case_events", "decision_cases", "source_snapshots", "users"):
             conn.execute(f"DELETE FROM {table}")
         if not conn.execute("SELECT 1 FROM app_settings WHERE key = 'source_mode'").fetchone():

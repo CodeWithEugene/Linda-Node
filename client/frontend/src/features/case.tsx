@@ -56,7 +56,7 @@ import PlayArrow from '@mui/icons-material/PlayArrow'
 import SmartToy from '@mui/icons-material/SmartToy'
 import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import { Timeline, TimelineConnector, TimelineContent, TimelineDot, TimelineItem, TimelineOppositeContent, TimelineSeparator } from '@mui/lab'
-import { api, post } from '../api'
+import { AI_ASSIST_TIMEOUT_MS, api, post } from '../api'
 import type { ActionCard, DecisionCase, ExportRecord, Role, Task } from '../api'
 import { useSession } from '../session'
 import {
@@ -273,7 +273,7 @@ function EvidenceTab({ caseItem }: { caseItem: DecisionCase }) {
     onSuccess: refresh,
   })
   const explain = useMutation({
-    mutationFn: () => post<ExplainerResult>(`/api/cases/${caseItem.id}/assists/explainer`, {}),
+    mutationFn: () => post<ExplainerResult>(`/api/cases/${caseItem.id}/assists/explainer`, {}, { timeoutMs: AI_ASSIST_TIMEOUT_MS }),
     onSuccess: setExplanation,
   })
 
@@ -520,7 +520,7 @@ function ActionsTab({ caseItem }: { caseItem: DecisionCase }) {
     onSuccess: () => { setTask(null); refresh() },
   })
   const matcherMutation = useMutation({
-    mutationFn: () => post<MatcherResult>(`/api/cases/${caseItem.id}/assists/matcher`, {}),
+    mutationFn: () => post<MatcherResult>(`/api/cases/${caseItem.id}/assists/matcher`, {}, { timeoutMs: AI_ASSIST_TIMEOUT_MS }),
     onSuccess: setMatcher,
   })
   const review = useMutation({
@@ -673,7 +673,7 @@ function TaskDialog(props: {
   const { task, action, setAction, code, setCode, note, setNote, onClose, onSubmit, busy, error, caseId, assistsEnabled } = props
   const [suggestion, setSuggestion] = useState<BlockerSuggestion | null>(null)
   const classify = useMutation({
-    mutationFn: () => post<BlockerSuggestion>(`/api/cases/${caseId}/assists/blockers`, { report: note }),
+    mutationFn: () => post<BlockerSuggestion>(`/api/cases/${caseId}/assists/blockers`, { report: note }, { timeoutMs: AI_ASSIST_TIMEOUT_MS }),
     onSuccess: (result) => { setSuggestion(result); setCode(result.code) },
   })
   const needsBlocker = ['block', 'decline'].includes(action)
