@@ -1,16 +1,66 @@
-name: CI
+name: Verify Linda Protocol
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Demo-week insurance: re-check the live ICPAC contract every morning.
+    - cron: "0 5 * * *"
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-      - run: pip install ./backend[dev]
-      - run: pytest backend/tests
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: server/backend/pyproject.toml
+      - run: python -m pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check app tests
+      - name: Policy and action-card schemas load
+        run: python -c "from app.library import validate_library; print(validate_library())"
+      - name: Tests
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: client/frontend/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc -b --noEmit
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  upstream-contract:
+    # Hits the real ICPAC endpoints and fails loudly if the shapes Linda depends
+    # on have drifted away from the recorded fixtures. Not run on every push.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[dev]'
+      - run: pytest -q -m contract --contract

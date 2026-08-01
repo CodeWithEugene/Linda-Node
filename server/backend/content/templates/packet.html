@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @page { size: A4; margin: 18mm; }
+    body { font: 10pt system-ui, -apple-system, "Segoe UI", sans-serif; color: #172217; }
+    h1, h2 { color: #1b5e20; } h1 { font-size: 20pt; margin-bottom: 4pt; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8pt; white-space: pre-wrap; word-break: break-word; }
+    table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
+    th, td { border: 1px solid #b9c5b9; padding: 5pt; vertical-align: top; text-align: left; }
+    th { background: #e8f5e9; } .note { border-left: 4px solid #ef6c00; background: #fff7e8; padding: 8pt; }
+    .ai { border: 1px dashed #1565c0; padding: 8pt; } footer { border-top: 1px solid #b9c5b9; margin-top: 16pt; padding-top: 8pt; font-size: 8pt; }
+  </style>
+</head>
+<body>
+  <h1>Linda Node Activation Decision Packet</h1>
+  <p><strong>$case_title</strong><br>Case $case_id · Area: $area_name ($area_id) · Hazard: $hazard · State: $state</p>
+  <p class="note">Recorded recommendation only. Linda Node moves no funds. All outputs are Exercise status.</p>
+  <h2>Why this action</h2><pre>$assessment</pre>
+  <h2>Evidence provenance</h2><pre>$evidence</pre>
+  <h2>Action cards and tranche recommendations</h2><pre>$action_cards</pre>
+  <h2>Readiness board</h2><table><tr><th>Task</th><th>State</th><th>Blocker</th></tr>$task_rows</table>
+  <h2>Signatures</h2><table><tr><th>Role</th><th>Decision</th><th>Digest</th><th>Signature</th></tr>$approval_rows</table>
+  <section class="ai"><strong>AI explanations</strong><pre>$ai_explanations</pre></section>
+  <footer>Cryptographically signed decision record (HMAC-SHA256) within the Linda demo system — not PKI, blockchain, or an external digital-signature service. Sources: ICPAC Thresholds platform, IGAD Anticipatory Action Roadmap, Kenya DRM Act 2026. Policy disclaimer: illustrative demo content. Manifest hash: <code>$manifest_sha256</code></footer>
+</body>
+</html>

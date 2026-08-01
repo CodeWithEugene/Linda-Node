@@ -1,0 +1,18 @@
+id: card_fodder_v1
+hazard: drought
+title: Fodder pre-positioning
+description: Secure fodder suppliers before grazing conditions deteriorate.
+owner_role: ngo_finance_lead
+supporting_roles: [county_drm_officer]
+lead_time_days: 18
+stage_required: ready
+budget:
+  currency: USD
+  readiness_tranche: { amount: 9500, released_at_stage: ready, items: [supplier pre-qualification] }
+  action_tranche: { amount: 78000, released_at_stage: go, items: [fodder purchase, distribution logistics] }
+effectiveness: 0.29
+prerequisites:
+  - { id: suppliers, title: Fodder suppliers pre-qualified, criticality: normal }
+evidence_required: [forecast]
+citations: [IFRC Kenya drought EAP2022KE02 budget-tranche pattern]
+disclaimer: Illustrative demo card, not an official SOP.

@@ -7,32 +7,26 @@
 
 # Local data samples
 data/
-var/
 
 # Dependencies & build output
-.venv/
 node_modules/
-__pycache__/
-*.pyc
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-coverage.xml
-htmlcov/
+.vite/
 .next/
 dist/
-.vite/
-playwright-report/
-test-results/
-*.db-shm
-*.db-wal
-*.db-journal
-*.log
-*.pid
-.DS_Store
-Thumbs.db
+
+# Tooling and local runtime state
 .gstack/
-*.ini
-*.mako
+.vercel/
+server/backend/.venv/
+server/backend/var/
+server/backend/*.egg-info/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+
+# Local planning and research notes
+what-to-build.md
+research.md
+
+# Local runtime state (SQLite DB + generated exports)
+var/

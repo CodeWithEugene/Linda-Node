@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ICPAC seasonal return-period forecast payload",
+  "description": "Validates the merged view of /api/datasets/forecasts/available/ and /api/datasets/forecasts/stats/ that the policy engine reads.",
+  "type": "object",
+  "required": ["forecasts"],
+  "properties": {
+    "forecasts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "indicator", "probability", "quantile", "lead_months"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "area_id": { "type": ["string", "null"] },
+          "area_name": { "type": ["string", "null"] },
+          "hazard": { "type": "string" },
+          "indicator": { "type": "string" },
+          "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+          "quantile": { "type": "number", "minimum": 0, "maximum": 1 },
+          "lead_months": { "type": "integer", "minimum": 0 },
+          "valid_date": { "type": ["string", "null"] },
+          "severity": { "type": ["string", "null"] },
+          "probability_source": { "type": "string" }
+        }
+      }
+    },
+    "issues": { "type": "array" }
+  }
+}

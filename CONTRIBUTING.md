@@ -1,45 +1,113 @@
-# Contributing to Linda Node
+<p align="center">
+  <img src="docs/brand/linda-node-logo-horizontal.png" alt="Linda Node" width="360" />
+</p>
 
-Thanks for your interest in Linda Node — a last-mile anticipatory action engine for the Greater Horn of Africa, built on ICPAC's open-source triggers pipeline.
+<h1 align="center">Contributing to Linda Node</h1>
 
-**Start by reading the [README](README.md) in full.** It is the single source of truth: the architecture ([§5](README.md#5-system-architecture)), the complete build specification ([§7](README.md#7-implementation-guide-for-developers--ai-agents)), and the phased plan with acceptance criteria ([§10](README.md#10-development-status-build-plan--milestones)). Contributions — human or AI-agent — should build the earliest incomplete phase and respect the scope cuts listed there.
+Linda Node is an activation-readiness control plane. Contributions should make the path from evidence to an approved, verifiable decision clearer, safer, and easier to audit. Do not add alert delivery, fund movement, or autonomous decision-making.
 
-## Ground Rules
+---
 
-1. **Honesty over polish.** Never present unbuilt features as built — in code comments, docs, or the README. This project's credibility depends on accurately citing ICPAC's real tooling (see [§6](README.md#6-icpac-data-infrastructure-what-we-integrate-with)); verify any claim about upstream repos/scripts against the actual source before writing it down.
-2. **Scope discipline.** The hackathon MVP is defined in [§10](README.md#10-development-status-build-plan--milestones). USSD/SMS, voice notes, mesh networking, extra languages, and Celery/Redis are roadmap items — don't build them now.
-3. **Safety-critical invariants** (do not weaken these in any PR):
-   - Trigger evaluation and the Triangulation Engine are **deterministic code** — the LLM never decides whether a trigger fired or whether a dossier may be issued.
-   - Proof of Risk dossiers are decision-support documents; a **human authorizes** any financing action.
-   - Community reports are untrusted input: structured-output classification only, never concatenated into system prompts, always rendered escaped.
-   - Every alert must attribute its forecast to ICPAC and avoid certainty inflation.
-4. **No secrets in the repo.** `.env` is gitignored; keep it that way. Keys belong in your environment or the deploy platform's secret store.
-5. **Files under 500 lines.** Split modules before they sprawl.
+## Before you begin
 
-## Development Setup
+Read the [root README](README.md) for the architecture and honesty guarantees, then the component guides in [`server/backend`](server/backend/README.md) and [`client/frontend`](client/frontend/README.md).
 
-Follow [README §7.2](README.md#72-environment--setup): clone, copy `.env.example` → `.env`, install backend (`pip install -e .` in `backend/`) and frontend (`npm install` in `frontend/`), and use ngrok for local Telegram webhooks. Enable `postgis` and `vector` extensions in your Supabase project.
+## Local development
 
-## Workflow
+```bash
+cd server/backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+cp .env.example .env
+.venv/bin/uvicorn app.main:app --reload --port 8001
 
-1. **Branch** from `main`: `feat/<short-name>`, `fix/<short-name>`, or `docs/<short-name>`.
-2. **Commit style:** [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-3. **Test:** `pytest` in `backend/` must pass; add tests for new ingestion parsers, spatial queries, and triangulation logic (fixtures with sample NetCDF/CSV live in `backend/tests/`).
-4. **Verify before PR:** run the relevant flow end-to-end (e.g., seed demo data with `scripts/seed_demo.py`, exercise the bot from a real Telegram client) — not just the test suite.
-5. **PR description:** what changed, why, which README phase/section it implements, and how you verified it.
+cd ../../client/frontend
+npm ci
+npm run dev
+```
 
-## Code Style
+Keep `DEMO_MODE=true` while developing unless you are deliberately testing a source-adapter failure path.
 
-- **Python:** type-hinted, `ruff` + `black` formatted, async-first (FastAPI/aiogram). Pydantic models for all I/O boundaries; validate input at system boundaries.
-- **TypeScript:** strict mode, functional React components, no `any` at API boundaries.
-- **Prompts:** all LLM prompts live in `backend/app/agents/prompts.py`, versioned as named constants — never inline prompt strings in handlers.
-- **SQL/PostGIS:** migrations as SQL files; every geometry column gets a GiST index.
+---
 
-## Reporting Issues
+## Engineering rules
 
-- **Bugs / feature requests:** open a GitHub issue with reproduction steps or a concrete use case.
-- **Security vulnerabilities:** do **not** open an issue — follow [SECURITY.md](SECURITY.md).
+These are not style preferences. Each one is enforced somewhere in the test suite, and breaking one changes what the product is allowed to claim.
+
+1. **Human authority is non-negotiable.** Deterministic code evaluates policy; a human records approvals. AI output must never change case state, eligibility, tasks, approvals, or money movement.
+
+2. **Never fabricate a stage.** If no policy condition passes, the stage is `null` and the assessment says *"no activation recommended"*. Do not introduce a default, a fallback, or a "closest" stage. This is the single most important guarantee in the codebase.
+
+3. **Hash the verbatim body, before parsing.** Upstream responses are stored exactly as received and hashed at that point, so any reviewer can reproduce a snapshot hash with `curl <url> | shasum -a 256`. Never hash a normalised or re-serialised view.
+
+4. **Keep provenance intact and distinguishable.** Official source, policy assumption, user-entered, and AI output must remain separable in storage, APIs, exports, and the UI. A synthetic or fixture value must never be labelled `official_source`, and recorded evidence always outranks a synthetic one.
+
+5. **Mask personal data on every read path.** Upstream trigger rules carry named individuals' email addresses. Fixtures retain them for provenance; every API response, UI render, packet, and export must mask them. If you add a response path, add it to the redaction sweep test.
+
+6. **Preserve the audit record.** Never add an update or delete path for `case_events`. Mutations must respect the optimistic case version and record the relevant event inside the same transaction.
+
+7. **Consume upstream science; never invent it.** Linda Node does not compute hazard models, indices, severity classifications, or exposure scores. Where a hazard needs a severity, map the upstream `severity_level` and say so in the policy file.
+
+8. **Treat external input as untrusted.** Validate API input, escape rendered text, and keep field reports out of system prompts. Assist calls use structured JSON only.
+
+9. **CAP stays `status=Exercise`.** This is a safety property, not demo framing: a CAP document marked `Actual` from a non-accredited sender can be ingested by a real alert aggregator. Do not change it to make a demo look better.
+
+10. **Never commit secrets.** `.env` files, API keys, webhook secrets, and generated runtime data stay local. `var/` is gitignored.
+
+11. **Keep scope deliberate.** Telegram, SMS/USSD delivery, payments, beneficiary selection, and live Husika write calls are not part of this project.
+
+---
+
+## Changing policy content
+
+Policies and action cards are **code-reviewed files**, not UI state. They live in `server/backend/content/` and are JSON-Schema validated at startup — an invalid file stops the process.
+
+- A new hazard needs `content/policies/<hazard>.yaml` with a `signal_basis` of `probability` or `upstream_severity`, plus a matching entry in `library.HAZARDS`.
+- A new action card needs an id matching `^card_[a-z0-9_]+_v[0-9]+$`, both budget tranches, at least one prerequisite, and a disclaimer.
+- Changing a threshold changes the policy hash, which is recorded on every case assessed against it. That is intended: old cases keep the version they were decided under.
+
+## Changing an adapter
+
+If an upstream shape changes, update the normaliser **and** `content/schemas/sources/<adapter>.schema.json` together, then re-record the fixture. Run the live contract suite before and after:
+
+```bash
+.venv/bin/pytest -q -m contract --contract
+```
+
+## Changing the integration API
+
+`/integration/v1/` is a frozen contract. Its response shape is pinned by `content/schemas/integration/activation.v1.schema.json` (`additionalProperties: false`) and asserted by a snapshot test. Adding or removing a field is a **breaking change** and requires `/integration/v2/`, not an edit in place.
+
+---
+
+## Verification
+
+Run everything before opening a pull request:
+
+```bash
+cd server/backend
+.venv/bin/ruff check app tests
+.venv/bin/python -c "from app.library import validate_library; print(validate_library())"
+.venv/bin/pytest -q
+
+cd ../../client/frontend
+npx tsc -b --noEmit
+npm test
+npm run build
+```
+
+When changing a workflow, also exercise the role-based path in a browser: a blocked critical task, a rejected stale version, the three-role approval path, and the affected export or partner endpoint.
+
+## Pull requests
+
+Branch from `main` with a `feat/`, `fix/`, `docs/`, or `test/` prefix. Write commit messages that explain *why* the change is needed, not just what changed.
+
+In the description, include the problem addressed, the behaviour changed and its trust or safety impact, the tests and manual verification performed, and any source, policy, OpenAPI, or fixture changes reviewers should inspect.
+
+## Reporting issues
+
+Use GitHub Issues for reproducible bugs and feature proposals. Do not report security vulnerabilities publicly; follow the [security policy](SECURITY.md).
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contribution is licensed under the [MIT License](LICENSE).

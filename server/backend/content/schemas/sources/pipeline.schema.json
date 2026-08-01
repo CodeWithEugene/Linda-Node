@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ibf-thresholds-triggers exceedance-probability CSV view",
+  "type": "object",
+  "required": ["files"],
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "area_id", "indicator", "probability", "quantile"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "area_id": { "type": "string" },
+          "area_name": { "type": ["string", "null"] },
+          "hazard": { "type": "string" },
+          "indicator": { "type": "string" },
+          "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+          "quantile": { "type": "number", "minimum": 0, "maximum": 1 },
+          "lead_months": { "type": "integer", "minimum": 0 },
+          "severity": { "type": ["string", "null"] },
+          "format": { "type": "string" },
+          "source_file": { "type": "string" }
+        }
+      }
+    }
+  }
+}

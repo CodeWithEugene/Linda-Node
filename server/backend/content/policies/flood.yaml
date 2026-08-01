@@ -1,0 +1,31 @@
+policy:
+  name: linda-flood-readiness-policy
+  authors: [Linda Node team]
+  disclaimer: >
+    Team-authored readiness policy. Linda does not classify flood severity: the stage below is mapped
+    from the severity level that ICPAC's own trigger rule assigns to a detected rainfall event. Costs
+    and effectiveness values are illustrative and are not official ICPAC, NDMA, or government policy.
+  hazard: flood
+  # CHIRPS rainfall is a monitoring indicator (supports_forecast: false), so flood readiness follows
+  # detected trigger events rather than a seasonal exceedance probability.
+  signal_basis: upstream_severity
+  ndma_phase_mapping:
+    ready: Alert
+    set: Alarm
+    go: Emergency
+  stages:
+    ready: { indicator: rainfall_chirps, condition: { upstream_severity_in: [low, minor, moderate] } }
+    set: { indicator: rainfall_chirps, condition: { upstream_severity_in: [high, major] } }
+    go: { indicator: rainfall_chirps, condition: { upstream_severity_in: [severe, extreme, critical] } }
+  gates:
+    - { id: source_freshness, description: Grounding snapshot is within the monitoring cadence }
+    - { id: schema_valid, description: All evidence snapshots pass their source schemas }
+    - { id: lead_time, description: Eligible action lead times fit the observed onset }
+  stop_trigger:
+    description: Revoke when the upstream rainfall trigger event is no longer active
+    condition: { on_indicator: rainfall_chirps, resolved_upstream: true }
+  cost_loss:
+    exposed_households: { source: official_source, value: 6500, citation: ICPAC admin-1 exposure baseline for the affected unit }
+    loss_per_household_usd: 240
+    margin_usd: 4000
+  source_freshness_max_days: 7

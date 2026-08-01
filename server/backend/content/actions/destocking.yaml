@@ -1,0 +1,19 @@
+id: card_destocking_v1
+hazard: drought
+title: Commercial destocking support
+description: Facilitate early livestock offtake at fair prices before body-condition collapse.
+owner_role: ngo_finance_lead
+supporting_roles: [county_drm_officer]
+lead_time_days: 30
+stage_required: set
+budget:
+  currency: USD
+  readiness_tranche: { amount: 18000, released_at_stage: ready, items: [transport framework contracts, market-day coordination] }
+  action_tranche: { amount: 100000, released_at_stage: go, items: [price support, offtake logistics] }
+effectiveness: 0.35
+prerequisites:
+  - { id: transport_secured, title: Transport contracts confirmed, criticality: critical }
+  - { id: market_dates, title: Market days scheduled with county, criticality: normal }
+evidence_required: [forecast, trigger_event]
+citations: [IFRC Kenya drought EAP2022KE02 budget-tranche pattern]
+disclaimer: Illustrative demo card, not an official SOP.
