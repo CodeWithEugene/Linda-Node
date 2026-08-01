@@ -18,6 +18,7 @@ export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signa
   const map = useRef<Map | null>(null)
   const selectArea = useRef(onAreaSelect)
   const [tilesUnavailable, setTilesUnavailable] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => { selectArea.current = onAreaSelect }, [onAreaSelect])
 
@@ -27,11 +28,18 @@ export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signa
       container: container.current,
       center: [37.9, 0.2],
       zoom: 5.2,
-      attributionControl: false,
       style: {
         version: 8,
-        sources: { carto: { type: 'raster', tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap contributors © CARTO' } },
-        layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+        sources: {
+          openstreetmap: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+          },
+        },
+        layers: [{ id: 'openstreetmap', type: 'raster', source: 'openstreetmap' }],
       },
     })
     instance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
@@ -48,9 +56,10 @@ export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signa
         const area = areas.find((item) => item.id === feature.properties?.id)
         if (area) selectArea.current?.(area)
       })
+      setMapReady(true)
     })
     map.current = instance
-    return () => { instance.remove(); map.current = null }
+    return () => { instance.remove(); map.current = null; setMapReady(false) }
   }, [])
 
   useEffect(() => {
@@ -75,7 +84,7 @@ export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signa
       }
       if (!bounds.isEmpty()) instance.fitBounds(bounds, { padding: 36, maxZoom: 8, duration: 0 })
     }
-  }, [areas, signals])
+  }, [areas, signals, mapReady])
 
   return <Box sx={{ position: 'relative', height: 300, borderRadius: 1, overflow: 'hidden', bgcolor: 'grey.100' }}><Box ref={container} aria-label="Signal areas map" sx={{ position: 'absolute', inset: 0 }} />{tilesUnavailable && <Alert severity="warning" sx={{ position: 'absolute', bottom: 8, left: 8, right: 8 }}>Basemap unavailable. Stored area boundaries remain visible.</Alert>}<Typography variant="caption" sx={{ position: 'absolute', left: 8, bottom: 8, bgcolor: 'rgba(255,255,255,.88)', px: .75, py: .25, borderRadius: .5 }}>Click an area to prepare a case.</Typography></Box>
 }
