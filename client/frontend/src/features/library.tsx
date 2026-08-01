@@ -28,8 +28,9 @@ import ExpandMore from '@mui/icons-material/ExpandMore'
 import { api } from '../api'
 import type { ActionCard } from '../api'
 import { ErrorPanel, HashBlock, money } from '../components'
+import type { IndicatorRegistry } from '../types'
 
-type StageDefinition = { indicator: string; condition: { probability_gte: number; quantile: number; min_lead_months?: number } }
+type StageDefinition = { indicator: string; condition: { probability_gte?: number; quantile?: number; min_lead_months?: number; upstream_severity_in?: string[] } }
 type PolicyDocument = {
   id: string
   raw: string
@@ -38,19 +39,24 @@ type PolicyDocument = {
       name: string
       disclaimer: string
       hazard: string
+      signal_basis?: 'probability' | 'upstream_severity'
       ndma_phase_mapping: Record<string, string>
       stages: Record<string, StageDefinition>
       gates: { id: string; description: string }[]
-      stop_trigger: { description: string; condition: { probability_lt: number; on_indicator: string } }
+      stop_trigger: { description: string; condition: { probability_lt?: number; on_indicator: string; resolved_upstream?: boolean } }
       cost_loss: { exposed_households: { value: number; citation: string }; loss_per_household_usd: number; margin_usd: number }
     }
   }
 }
 
+const HAZARDS = ['drought', 'heat', 'flood'] as const
+
 export function LibraryPage() {
   const [tab, setTab] = useState('policy')
-  const policy = useQuery({ queryKey: ['policy'], queryFn: () => api<PolicyDocument>('/api/library/policy') })
+  const [hazard, setHazard] = useState<(typeof HAZARDS)[number]>('drought')
+  const policy = useQuery({ queryKey: ['policy', hazard], queryFn: () => api<PolicyDocument>(`/api/library/policy?hazard=${hazard}`) })
   const cards = useQuery({ queryKey: ['action-library'], queryFn: () => api<ActionCard[]>('/api/library/actions') })
+  const indicators = useQuery({ queryKey: ['indicators'], queryFn: () => api<IndicatorRegistry>('/api/library/indicators') })
   const document = policy.data?.data.policy
 
   return (
@@ -61,9 +67,16 @@ export function LibraryPage() {
       </Typography>
 
       <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 2 }}>
-        <Tab value="policy" label="Policy" />
+        <Tab value="policy" label="Policies" />
         <Tab value="actions" label={`Action cards (${cards.data?.length ?? 0})`} />
+        <Tab value="indicators" label={`ICPAC indicators (${indicators.data?.indicators.length ?? 0})`} />
       </Tabs>
+
+      {tab === 'policy' && (
+        <Tabs value={hazard} onChange={(_, value) => setHazard(value)} sx={{ mb: 2 }} textColor="secondary" indicatorColor="secondary">
+          {HAZARDS.map((item) => <Tab key={item} value={item} label={item} sx={{ textTransform: 'capitalize' }} />)}
+        </Tabs>
+      )}
 
       {tab === 'policy' &&
         (policy.isLoading ? (
@@ -95,13 +108,21 @@ export function LibraryPage() {
                             <TableCell><strong>{name.toUpperCase()}</strong></TableCell>
                             <TableCell>{document?.ndma_phase_mapping?.[name]}</TableCell>
                             <TableCell className="mono">
-                              P ≥ {definition.condition.probability_gte} @q≤{definition.condition.quantile}
-                              {definition.condition.min_lead_months ? `, lead ≥ ${definition.condition.min_lead_months}m` : ''}
+                              {definition.condition.upstream_severity_in
+                                ? `ICPAC severity_level ∈ {${definition.condition.upstream_severity_in.join(', ')}}`
+                                : `P ≥ ${definition.condition.probability_gte} @q≤${definition.condition.quantile}${definition.condition.min_lead_months ? `, lead ≥ ${definition.condition.min_lead_months}m` : ''}`}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                    {document?.signal_basis === 'upstream_severity' && (
+                      <Alert severity="info" sx={{ mt: 1.5 }}>
+                        {document.hazard} readiness follows ICPAC&rsquo;s own detected trigger events: {document.hazard === 'heat' ? 'TMAX' : 'rainfall'} is
+                        published as a monitoring indicator, not a forecast one. Linda maps their <span className="mono">severity_level</span> to a
+                        stage and never classifies severity itself.
+                      </Alert>
+                    )}
                   </CardContent>
                 </Card>
                 <Card>
@@ -115,8 +136,11 @@ export function LibraryPage() {
                       ))}
                     </List>
                     <Alert severity="info">
-                      <strong>Stop trigger:</strong> {document?.stop_trigger.description} — revokes when P &lt;{' '}
-                      {document?.stop_trigger.condition.probability_lt} on <span className="mono">{document?.stop_trigger.condition.on_indicator}</span>.
+                      <strong>Stop trigger:</strong> {document?.stop_trigger.description} —{' '}
+                      {document?.stop_trigger.condition.resolved_upstream
+                        ? 'revokes when the upstream trigger event is no longer active'
+                        : `revokes when P < ${document?.stop_trigger.condition.probability_lt}`}{' '}
+                      on <span className="mono">{document?.stop_trigger.condition.on_indicator}</span>.
                     </Alert>
                   </CardContent>
                 </Card>
@@ -142,6 +166,54 @@ export function LibraryPage() {
               </Card>
             </Grid>
           </Grid>
+        ))}
+
+      {tab === 'indicators' &&
+        (indicators.isLoading ? (
+          <Skeleton variant="rounded" height={300} />
+        ) : indicators.error ? (
+          <ErrorPanel error={indicators.error} retry={() => indicators.refetch()} />
+        ) : (
+          <Card>
+            <CardHeader
+              title="ICPAC indicator registry"
+              subheader="Read live from /api/datasets/indicators/ — this is what constrains which hazards can be forecast at all"
+            />
+            <CardContent sx={{ pt: 0 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Indicator</TableCell>
+                    <TableCell>Code</TableCell>
+                    <TableCell>Category</TableCell>
+                    <TableCell>Unit</TableCell>
+                    <TableCell>Forecast</TableCell>
+                    <TableCell>Monitoring</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {indicators.data?.indicators.map((item) => (
+                    <TableRow key={item.code}>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell className="mono">{item.code}</TableCell>
+                      <TableCell><Chip size="small" label={item.category} /></TableCell>
+                      <TableCell>{item.unit}</TableCell>
+                      <TableCell>
+                        <Chip size="small" color={item.supports_forecast ? 'success' : 'default'} label={item.supports_forecast ? 'yes' : 'no'} />
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" color={item.supports_monitoring ? 'success' : 'default'} label={item.supports_monitoring ? 'yes' : 'no'} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <Typography variant="caption" color="text.secondary">
+                Only SPI-3 / CHIRPS supports seasonal forecasting, which is why drought readiness is probability-driven while heat and
+                flood readiness follow detected trigger events.
+              </Typography>
+            </CardContent>
+          </Card>
         ))}
 
       {tab === 'actions' &&

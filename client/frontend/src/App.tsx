@@ -40,6 +40,7 @@ import LightMode from '@mui/icons-material/LightMode'
 import Logout from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import Policy from '@mui/icons-material/Policy'
+import Public from '@mui/icons-material/Public'
 import Source from '@mui/icons-material/Source'
 import { api } from './api'
 import { ProvenanceLegend } from './components'
@@ -59,6 +60,7 @@ const InboxPage = lazy(() => import('./pages').then((module) => ({ default: modu
 const IntegrationsPage = lazy(() => import('./pages').then((module) => ({ default: module.IntegrationsPage })))
 const LibraryPage = lazy(() => import('./pages').then((module) => ({ default: module.LibraryPage })))
 const LoginPage = lazy(() => import('./pages').then((module) => ({ default: module.LoginPage })))
+const RegionalPage = lazy(() => import('./pages').then((module) => ({ default: module.RegionalPage })))
 const SourcesPage = lazy(() => import('./pages').then((module) => ({ default: module.SourcesPage })))
 
 export function App() {
@@ -106,7 +108,8 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
     <Shell {...props}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
-          <Route path="/" element={<InboxPage />} />
+          <Route path="/" element={<RegionalPage />} />
+          <Route path="/signals" element={<InboxPage />} />
           <Route path="/cases" element={<CasesPage />} />
           <Route path="/cases/:caseId" element={<CaseDetailPage />} />
           <Route path="/audit" element={<AuditPage />} />
@@ -127,7 +130,8 @@ function PageFallback() {
 }
 
 const NAVIGATION = [
-  ['/', 'Signal Inbox', <Inbox key="inbox" />],
+  ['/', 'Regional Readiness', <Public key="regional" />],
+  ['/signals', 'Signal Inbox', <Inbox key="inbox" />],
   ['/cases', 'Decision Cases', <FactCheck key="cases" />],
   ['/audit', 'Audit Log', <AccountTree key="audit" />],
   ['/library', 'Policy & Actions', <Policy key="library" />],
@@ -147,6 +151,8 @@ function ModeBanner() {
   const replay = sources.filter((item) => item.freshness === 'replay')
   const invalid = sources.filter((item) => !item.schema_ok)
 
+  // Only surfaced when the data is not what it should be. A healthy live
+  // system shows no banner at all.
   if (invalid.length) {
     return (
       <Alert severity="error" sx={{ mb: 2 }}>
@@ -161,22 +167,16 @@ function ModeBanner() {
       </Alert>
     )
   }
-  if (replay.length) {
-    const synthetic = replay.some((item) => item.meta?.synthetic || item.meta?.provenance?.synthetic)
+  const synthetic = replay.filter((item) => item.meta?.synthetic || item.meta?.provenance?.synthetic)
+  if (synthetic.length) {
     return (
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Replay evidence in use for {replay.map((item) => item.adapter).join(', ')}
-        {synthetic ? ` · includes a labelled synthetic escalation (step ${status.data.escalation_step})` : ''}. Exports and partner responses
-        are labelled <strong>Exercise</strong>; Linda moves no funds and sends no public alert.
+      <Alert severity="warning" sx={{ mb: 2 }}>
+        Synthetic escalation step {status.data.escalation_step} is active for {synthetic.map((item) => item.adapter).join(', ')}. Switch
+        the source mode back to live in Admin to return to recorded ICPAC statistics.
       </Alert>
     )
   }
-  return (
-    <Alert severity="success" sx={{ mb: 2 }}>
-      Live ICPAC evidence. Exports and partner responses are labelled <strong>Exercise</strong>; Linda moves no funds and sends no
-      public alert.
-    </Alert>
-  )
+  return null
 }
 
 function Shell({ children, preference, setPreference }: { children: ReactNode; preference: ThemePreference; setPreference: (value: ThemePreference) => void }) {
@@ -219,7 +219,6 @@ function Shell({ children, preference, setPreference }: { children: ReactNode; p
           <IconButton color="inherit" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }} aria-label="Open navigation"><MenuIcon /></IconButton>
           <Gavel sx={{ mr: 1 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>Linda Protocol</Typography>
-          <Chip label="Exercise mode" size="small" color="warning" sx={{ mr: 1, display: { xs: 'none', sm: 'inline-flex' } }} />
           <Tooltip title="Provenance legend">
             <IconButton color="inherit" onClick={() => setHelpOpen(true)} aria-label="Open provenance legend"><HelpOutline /></IconButton>
           </Tooltip>

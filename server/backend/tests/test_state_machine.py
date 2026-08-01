@@ -11,9 +11,9 @@ from app.db import connection, reset_demo
 from app.main import app
 from app.services import canonical_case_json, get_case
 
-BLOCKED_CASE = "case_bungoma_ond2026"
-DONE_CASE = "case_bungoma_ond2026_handedoff"
-REVOKED_CASE = "case_bungoma_ond2026_revoked"
+BLOCKED_CASE = "case_ruvuma_ond2026"
+DONE_CASE = "case_ruvuma_ond2026_handedoff"
+REVOKED_CASE = "case_ruvuma_ond2026_revoked"
 
 
 @pytest.fixture()

@@ -2,37 +2,115 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Linda Protocol decision policy",
   "type": "object",
-  "required": ["policy"],
+  "required": [
+    "policy"
+  ],
   "properties": {
     "policy": {
       "type": "object",
-      "required": ["name", "disclaimer", "hazard", "ndma_phase_mapping", "stages", "gates", "stop_trigger", "cost_loss"],
+      "required": [
+        "name",
+        "disclaimer",
+        "hazard",
+        "ndma_phase_mapping",
+        "stages",
+        "gates",
+        "stop_trigger",
+        "cost_loss"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 3 },
-        "authors": { "type": "array", "items": { "type": "string" } },
-        "disclaimer": { "type": "string", "minLength": 20 },
-        "hazard": { "type": "string", "enum": ["drought", "flood", "heat"] },
+        "name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disclaimer": {
+          "type": "string",
+          "minLength": 20
+        },
+        "hazard": {
+          "type": "string",
+          "enum": [
+            "drought",
+            "flood",
+            "heat"
+          ]
+        },
         "ndma_phase_mapping": {
           "type": "object",
-          "required": ["ready", "set", "go"],
-          "additionalProperties": { "type": "string" }
+          "required": [
+            "ready",
+            "set",
+            "go"
+          ],
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "stages": {
           "type": "object",
-          "required": ["ready", "set", "go"],
+          "required": [
+            "ready",
+            "set",
+            "go"
+          ],
           "additionalProperties": {
             "type": "object",
-            "required": ["indicator", "condition"],
+            "required": [
+              "indicator",
+              "condition"
+            ],
             "properties": {
-              "indicator": { "type": "string" },
+              "indicator": {
+                "type": "string"
+              },
               "condition": {
                 "type": "object",
-                "required": ["probability_gte", "quantile"],
-                "properties": {
-                  "probability_gte": { "type": "number", "minimum": 0, "maximum": 1 },
-                  "quantile": { "type": "number", "minimum": 0, "maximum": 1 },
-                  "min_lead_months": { "type": "integer", "minimum": 0 }
-                }
+                "oneOf": [
+                  {
+                    "required": [
+                      "probability_gte",
+                      "quantile"
+                    ],
+                    "properties": {
+                      "probability_gte": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "quantile": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "min_lead_months": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "required": [
+                      "upstream_severity_in"
+                    ],
+                    "properties": {
+                      "upstream_severity_in": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
               }
             }
           }
@@ -42,43 +120,106 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["id", "description"],
-            "properties": { "id": { "type": "string" }, "description": { "type": "string" } }
+            "required": [
+              "id",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
           }
         },
         "stop_trigger": {
           "type": "object",
-          "required": ["description", "condition"],
+          "required": [
+            "description",
+            "condition"
+          ],
           "properties": {
-            "description": { "type": "string" },
+            "description": {
+              "type": "string"
+            },
             "condition": {
               "type": "object",
-              "required": ["probability_lt", "on_indicator"],
+              "required": [
+                "on_indicator"
+              ],
               "properties": {
-                "probability_lt": { "type": "number", "minimum": 0, "maximum": 1 },
-                "on_indicator": { "type": "string" }
+                "probability_lt": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "on_indicator": {
+                  "type": "string"
+                },
+                "resolved_upstream": {
+                  "type": "boolean"
+                }
               }
             }
           }
         },
         "cost_loss": {
           "type": "object",
-          "required": ["exposed_households", "loss_per_household_usd", "margin_usd"],
+          "required": [
+            "exposed_households",
+            "loss_per_household_usd",
+            "margin_usd"
+          ],
           "properties": {
             "exposed_households": {
               "type": "object",
-              "required": ["source", "value", "citation"],
+              "required": [
+                "source",
+                "value",
+                "citation"
+              ],
               "properties": {
-                "source": { "type": "string", "enum": ["manual", "official_source", "user_entered"] },
-                "value": { "type": "number", "exclusiveMinimum": 0 },
-                "citation": { "type": "string", "minLength": 5 }
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "manual",
+                    "official_source",
+                    "user_entered"
+                  ]
+                },
+                "value": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "citation": {
+                  "type": "string",
+                  "minLength": 5
+                }
               }
             },
-            "loss_per_household_usd": { "type": "number", "exclusiveMinimum": 0 },
-            "margin_usd": { "type": "number", "minimum": 0 }
+            "loss_per_household_usd": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "margin_usd": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         },
-        "source_freshness_max_days": { "type": "integer", "minimum": 1 }
+        "source_freshness_max_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "signal_basis": {
+          "type": "string",
+          "enum": [
+            "probability",
+            "upstream_severity"
+          ]
+        }
       }
     }
   }

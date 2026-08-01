@@ -9,7 +9,7 @@ from app.exports import cap_xml, husika_payload, validate_cap
 from app.main import app
 from app.services import get_case, verify_event_chain
 
-CASE_ID = "case_bungoma_ond2026"
+CASE_ID = "case_ruvuma_ond2026"
 
 
 def test_reset_demo_initializes_a_fresh_database(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -188,8 +188,8 @@ def test_replay_sources_can_assess_a_new_case() -> None:
         source_status = client.get("/api/sources/status")
         assert source_status.status_code == 200
         snapshots = source_status.json()["sources"]
-        assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas", "pipeline"}
-        created = client.post("/api/cases", json={"title": "New replay assessment", "area_id": "KEN.3_1", "area_name": "Bungoma", "hazard": "drought"})
+        assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas", "indicators", "pipeline"}
+        created = client.post("/api/cases", json={"title": "New replay assessment", "area_id": "KEN.3_1", "area_name": "Ruvuma", "hazard": "drought"})
         assert created.status_code == 201
         case = created.json()
         assessed = client.post(f"/api/cases/{case['id']}/assess", json={"snapshot_ids": [item["id"] for item in snapshots], "version": case["version"]})

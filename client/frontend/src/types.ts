@@ -102,3 +102,75 @@ export type ApprovalVerification = {
 
 export type IneligibleCard = { card: string; reason: string }
 export type EligibleCard = ActionCard
+
+export type TileSource = {
+  layer: string
+  catalog_url: string
+  tile_url: string
+  source_layer: string
+  join_property: string
+  attribution: string
+  min_zoom: number
+  max_zoom: number
+}
+
+export type RegionalHazard = {
+  hazard: string
+  stage: string | null
+  basis: 'probability' | 'upstream_severity'
+  observed: number | string | null
+  indicator?: string
+  value?: number | null
+  threshold_value?: number | null
+  policy_version_id: string
+}
+
+export type RegionalUnit = {
+  area_id: string
+  area_name: string
+  country: string
+  country_name: string
+  probability: number
+  return_periods: Record<string, number>
+  valid_date?: string
+  lead_months?: number
+  indicator?: string
+  hazards: RegionalHazard[]
+  stage: string | null
+  stage_hazard: string | null
+  ndma_phase: string | null
+  compound: boolean
+  snapshot_id: string
+}
+
+export type RegionalEvidence = {
+  snapshot_id: string
+  sha256: string
+  endpoint_url: string
+  freshness: Freshness
+  retrieved_at: string
+}
+
+export type RegionalOverview = {
+  mode: 'live_first' | 'replay_only'
+  generated_at: string
+  issue: { id?: string; season?: string; year?: number; valid_date?: string; lead_months?: number; indicator?: string; data_source?: string }
+  available_issues: { id: string; target_season: string; target_year: number; lead_months: number; valid_date: string }[]
+  evidence: Record<string, RegionalEvidence>
+  policies: Record<string, string>
+  totals: {
+    units: number; countries: number; activating: number
+    ready: number; set: number; go: number; compound: number; max_probability: number
+  }
+  countries: { country: string; country_name: string; units: number; activating: number; max_probability: number; stages: Record<string, number> }[]
+  units: RegionalUnit[]
+  tiles: TileSource
+}
+
+export type IndicatorRegistry = {
+  indicators: {
+    code: string; name: string; category?: string | null; data_source?: string | null
+    unit?: string | null; description?: string | null
+    supports_forecast: boolean; supports_monitoring: boolean; timescale_months?: number | null
+  }[]
+}

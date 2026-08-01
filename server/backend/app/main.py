@@ -50,7 +50,8 @@ from .integration import (
     revoke_key,
     verify_activation,
 )
-from .library import action_cards, policy
+from .library import action_cards, policies, policy
+from .regional import regional_overview
 from .services import (
     attach_evidence_and_assess,
     case_events,
@@ -64,17 +65,21 @@ from .services import (
     verify_approvals,
     verify_event_chain,
 )
-from .sources import areas as source_areas
 from .sources import (
+    area_geometry,
     get_snapshot,
     list_snapshots,
+    refresh_adapter,
     refresh_all,
     replay_step,
+    set_forecast_issue,
     set_replay_step,
     set_source_mode,
     signals,
     source_mode,
+    tile_source,
 )
+from .sources import areas as source_areas
 
 
 class LoginInput(BaseModel):
@@ -144,6 +149,10 @@ class SourceModeInput(BaseModel):
 
 class ReplayStepInput(BaseModel):
     step: int = Field(ge=0, le=3)
+
+
+class ForecastIssueInput(BaseModel):
+    issue_id: str | None = Field(default=None, max_length=64)
 
 
 @asynccontextmanager
@@ -370,8 +379,37 @@ def download(export_id: str, _: dict[str, Any] = Depends(current_user)) -> Respo
     return Response(payload, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{record["id"]}.{suffix}"'})
 
 
+@app.get("/api/regional")
+def regional(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    """Live readiness ranking across every GHA admin-1 unit ICPAC publishes."""
+    with transaction() as conn: return regional_overview(conn)
+
+
+@app.get("/api/areas/{country}/geometry")
+def area_geometry_route(country: str, _: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    try:
+        with transaction() as conn: return area_geometry(conn, country)
+    except ValueError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@app.get("/api/library/tiles")
+def library_tiles(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]: return tile_source()
+
+
+@app.get("/api/library/indicators")
+def library_indicators(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    """ICPAC's own indicator registry — which indicators can actually be forecast."""
+    with transaction() as conn: return refresh_adapter(conn, "indicators")["payload"]
+
+
+@app.get("/api/library/policies")
+def library_policies(_: dict[str, Any] = Depends(current_user)) -> list[dict[str, Any]]: return policies()
+
+
 @app.get("/api/library/policy")
-def library_policy(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]: return policy()
+def library_policy(hazard: str = "drought", _: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    try: return policy(hazard)
+    except Exception as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @app.get("/api/library/actions")
@@ -441,6 +479,16 @@ def replay_mode(payload: SourceModeInput, _: dict[str, Any] = Depends(require_ro
     try:
         with transaction() as conn: return {"mode": set_source_mode(conn, payload.mode)}
     except ValueError as exc: raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@app.post("/api/admin/forecast-issue")
+def admin_forecast_issue(payload: ForecastIssueInput, _: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, Any]:
+    """Choose which published seasonal forecast issue the region is assessed against."""
+    with transaction() as conn:
+        issue = set_forecast_issue(conn, payload.issue_id or None)
+        # Snapshots stay append-only; the next read simply sees a different
+        # selection and fetches a new one.
+        return {"issue_id": issue, "snapshot": refresh_adapter(conn, "forecasts", force=True)["id"]}
 
 
 @app.post("/api/admin/replay-step")

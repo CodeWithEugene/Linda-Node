@@ -9,6 +9,19 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Map libraries are only needed by the two map screens; keeping them in
+        // their own chunks holds the initial payload down.
+        manualChunks: {
+          maplibre: ['maplibre-gl'],
+          leaflet: ['leaflet', 'react-leaflet'],
+          datagrid: ['@mui/x-data-grid'],
+        },
+      },
+    },
+  },
     server: {
       host: '127.0.0.1',
       port: 5173,

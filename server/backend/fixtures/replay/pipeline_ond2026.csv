@@ -1,5 +1,13 @@
 admin_id,admin_name,season,indicator,quantile,probability,lead_months
-KEN.3_1,Bungoma,OND-2026,spi3_chirps_forecast,0.33,0.52,3
-KEN.25_1,Marsabit,OND-2026,spi3_chirps_forecast,0.33,0.024,3
-KEN.43_1,Turkana,OND-2026,spi3_chirps_forecast,0.33,0.020,3
-KEN.40_1,Tana River,OND-2026,spi3_chirps_forecast,0.33,0.031,3
+TZA.22_1,Ruvuma,OND-2026,spi3_chirps_forecast,0.33,0.518,3
+TZA.15_1,Mtwara,OND-2026,spi3_chirps_forecast,0.33,0.449,3
+TZA.17_1,Njombe,OND-2026,spi3_chirps_forecast,0.33,0.332,3
+SDN.3_1,Blue Nile,OND-2026,spi3_chirps_forecast,0.33,0.328,3
+TZA.10_1,Lindi,OND-2026,spi3_chirps_forecast,0.33,0.327,3
+SSD.7_1,Upper Nile,OND-2026,spi3_chirps_forecast,0.33,0.316,3
+TZA.13_1,Mbeya,OND-2026,spi3_chirps_forecast,0.33,0.315,3
+TZA.5_1,Iringa,OND-2026,spi3_chirps_forecast,0.33,0.305,3
+TZA.31_1,Songwe,OND-2026,spi3_chirps_forecast,0.33,0.248,3
+SDN.2_1,Al Qadarif,OND-2026,spi3_chirps_forecast,0.33,0.245,3
+ERI.3_1,Debubawi Keyih Bahri,OND-2026,spi3_chirps_forecast,0.33,0.239,3
+DJI.4_1,Obock,OND-2026,spi3_chirps_forecast,0.33,0.235,3

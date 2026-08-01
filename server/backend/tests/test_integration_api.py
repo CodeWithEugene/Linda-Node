@@ -18,8 +18,8 @@ from app.domain import canonical_json
 from app.main import app
 
 SCHEMA = Path(__file__).resolve().parents[1] / "content" / "schemas" / "integration" / "activation.v1.schema.json"
-PUBLISHED = "case_bungoma_ond2026_handedoff"
-UNPUBLISHED = "case_bungoma_ond2026"
+PUBLISHED = "case_ruvuma_ond2026_handedoff"
+UNPUBLISHED = "case_ruvuma_ond2026"
 
 
 @pytest.fixture()
@@ -52,7 +52,7 @@ def test_public_surfaces_need_no_key(admin: TestClient) -> None:
 def test_the_cap_feed_publishes_approved_and_revoked_activations(admin: TestClient) -> None:
     body = admin.get("/cap/feed.xml").text
     assert PUBLISHED in body
-    assert "case_bungoma_ond2026_revoked" in body
+    assert "case_ruvuma_ond2026_revoked" in body
     assert "<status>Exercise</status>" in body or "Exercise" in body
     assert UNPUBLISHED not in body.replace(f"{UNPUBLISHED}_handedoff", "").replace(f"{UNPUBLISHED}_revoked", "")
 
@@ -81,7 +81,7 @@ def test_a_valid_key_reads_activations(admin: TestClient) -> None:
     body = response.json()
     assert body["mode"] == "exercise"
     assert body["disclaimer"]
-    assert {item["id"] for item in body["items"]} == {PUBLISHED, "case_bungoma_ond2026_revoked"}
+    assert {item["id"] for item in body["items"]} == {PUBLISHED, "case_ruvuma_ond2026_revoked"}
 
 
 def test_a_revoked_key_stops_working(admin: TestClient) -> None:
@@ -262,7 +262,7 @@ async def test_a_failing_endpoint_is_retried_and_recorded(monkeypatch: pytest.Mo
             raise integration.httpx.ConnectError("refused")
 
     monkeypatch.setattr(integration.httpx, "AsyncClient", lambda **_: Client())
-    await integration.deliver_webhooks("case_bungoma_ond2026_revoked", "activation.revoked")
+    await integration.deliver_webhooks("case_ruvuma_ond2026_revoked", "activation.revoked")
     with connection() as conn:
         attempts = [dict(row) for row in conn.execute("SELECT * FROM webhook_deliveries")]
         failed = conn.execute(

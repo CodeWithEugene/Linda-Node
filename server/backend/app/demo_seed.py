@@ -26,7 +26,11 @@ from .sources import (
 )
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "replay"
-BUNGOMA = ("KEN.3_1", "Bungoma")
+
+# The seeded scenario runs on a real admin-1 unit whose *recorded* ICPAC
+# statistic already crosses a policy stage — Ruvuma, Tanzania at 51.8% rp3
+# exceedance for OND 2026. Nothing in the default seed is synthetic.
+DEMO_AREA = ("TZA.22_1", "Ruvuma", "Tanzania")
 
 
 def _fixture(name: str) -> tuple[str, dict[str, Any]]:
@@ -56,7 +60,7 @@ def _insert_snapshot(conn: Any, snapshot_id: str, adapter: str, location: str, p
 
 def _seed_snapshots(conn: Any, created_at: str) -> dict[str, dict[str, Any]]:
     triggers_text, triggers_raw = _fixture("triggers.json")
-    forecasts_text, forecasts_raw = _fixture("escalation/step2.json")
+    forecasts_text, forecasts_raw = _fixture("forecasts.json")
     areas_text, areas_raw = _fixture("areas.json")
     pipeline_text = (FIXTURE_ROOT / "pipeline_ond2026.csv").read_text(encoding="utf-8")
     return {
@@ -65,9 +69,10 @@ def _seed_snapshots(conn: Any, created_at: str) -> dict[str, dict[str, Any]]:
             normalise_triggers(triggers_raw.get("rules"), triggers_raw.get("events"), triggers_raw.get("actions"), triggers_raw.get("check_logs")),
             triggers_text, {"mode": "replay_only", "provenance": triggers_raw.get("_provenance", {})}, created_at),
         "forecasts": _insert_snapshot(
-            conn, "snap_0000seed_forecasts", "forecasts", "fixtures/replay/escalation/step2.json",
+            conn, "snap_0000seed_forecasts", "forecasts", "fixtures/replay/forecasts.json",
             normalise_forecasts(forecasts_raw.get("available"), forecasts_raw.get("stats")),
-            forecasts_text, {"mode": "replay_only", "synthetic": True, "escalation_step": 2,
+            forecasts_text, {"mode": "replay_only", "synthetic": False, "escalation_step": 0,
+                             "coverage": "all GHA countries",
                              "provenance": forecasts_raw.get("_provenance", {})}, created_at),
         "areas": _insert_snapshot(
             conn, "snap_0000seed_areas", "areas", "fixtures/replay/areas.json",
@@ -76,16 +81,16 @@ def _seed_snapshots(conn: Any, created_at: str) -> dict[str, dict[str, Any]]:
         "pipeline": _insert_snapshot(
             conn, "snap_0000seed_pipeline", "pipeline", "fixtures/replay/pipeline_ond2026.csv",
             parse_pipeline_csv(pipeline_text, source_file="03_prob_csv_q.py compatible output"),
-            pipeline_text, {"mode": "replay_only", "synthetic": True, "format": "exceedance_probability_csv"}, created_at),
+            pipeline_text, {"mode": "replay_only", "synthetic": False, "format": "exceedance_probability_csv"}, created_at),
     }
 
 
 def _evidence_from(snapshots: list[dict[str, Any]]) -> list[dict[str, Any]]:
     kinds = {"forecasts": "forecast", "triggers": "trigger_event", "areas": "area", "pipeline": "pipeline_csv"}
     labels = {
-        "forecasts": "OND 2026 return-period exceedance (synthetic escalation step 2)",
+        "forecasts": "OND 2026 return-period exceedance for all 214 GHA admin-1 units",
         "triggers": "ICPAC trigger rules, events and actions (incl. Bungoma Triggers)",
-        "areas": "GADM admin-1 boundaries",
+        "areas": "GADM admin-1 index for the 11 GHA countries",
         "pipeline": "ibf-thresholds-triggers exceedance CSV",
     }
     return [{
@@ -101,7 +106,7 @@ def _insert_case(conn: Any, case_id: str, title: str, state: str, assessment: di
     conn.execute(
         """INSERT INTO decision_cases (id,area_id,area_name,hazard,title,state,policy_version_id,assessment_json,evidence_json,action_card_ids_json,stage,version,created_by,created_at,updated_at)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (case_id, BUNGOMA[0], BUNGOMA[1], "drought", title, state, assessment["policy_version_id"],
+        (case_id, DEMO_AREA[0], DEMO_AREA[1], "drought", title, state, assessment["policy_version_id"],
          canonical_json(assessment), canonical_json(evidence),
          canonical_json([card["id"] for card in action_cards() if card["hazard"] == "drought"]),
          assessment["stage"], version, "usr_david", created_at, created_at),
@@ -121,7 +126,7 @@ def _insert_tasks(conn: Any, case_id: str, assessment: dict[str, Any], created_a
             conn.execute(
                 """INSERT INTO readiness_tasks (id,case_id,action_card_id,title,owner_role,owner_user_id,criticality,state,blocker_code,blocker_note,updated_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (f"task_{case_id[-6:]}_{index}" if case_id != "case_bungoma_ond2026" else _stable_task_id(prerequisite["id"]),
+                (f"task_{case_id[-6:]}_{index}" if case_id != "case_ruvuma_ond2026" else _stable_task_id(prerequisite["id"]),
                  case_id, card_id, prerequisite["title"], card["owner_role"], None, prerequisite["criticality"],
                  "BLOCKED" if is_blocker else "ACKNOWLEDGED",
                  "LOGISTICS_TRANSPORT" if is_blocker else None,
@@ -167,13 +172,13 @@ def seed_cases(conn: Any) -> None:
     snapshots = _seed_snapshots(conn, created_at)
     grounding = [snapshots["forecasts"], snapshots["triggers"], snapshots["pipeline"], snapshots["areas"]]
     evidence = _evidence_from(grounding)
-    assessment = evaluate(grounding, "drought", BUNGOMA[0])
+    assessment = evaluate(grounding, "drought", DEMO_AREA[0])
 
     # 1. The scripted blocker case a judge advances themselves.
-    live_id = "case_bungoma_ond2026"
-    _insert_case(conn, live_id, "OND 2026 drought — Bungoma", "ASSESSED", assessment, evidence, created_at)
+    live_id = "case_ruvuma_ond2026"
+    _insert_case(conn, live_id, "OND 2026 drought — Ruvuma, Tanzania", "ASSESSED", assessment, evidence, created_at)
     _insert_tasks(conn, live_id, assessment, created_at, blocked=True)
-    append_event(conn, live_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Bungoma", "mode": "exercise"})
+    append_event(conn, live_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Ruvuma, Tanzania", "mode": "exercise"})
     append_event(conn, live_id, "system", "ASSESSED", {
         "stage": assessment["stage"], "gates_passed": all(gate["passed"] for gate in assessment["gates"]),
         "compound_signals": assessment["compound_signals"], "snapshot_ids": [item["id"] for item in grounding],
@@ -183,10 +188,10 @@ def seed_cases(conn: Any) -> None:
     })
 
     # 2. A completed activation with all four exports already generated.
-    done_id = "case_bungoma_ond2026_handedoff"
-    _insert_case(conn, done_id, "OND 2026 drought — Bungoma (completed activation)", "READY_FOR_REVIEW", assessment, evidence, created_at, version=4)
+    done_id = "case_ruvuma_ond2026_handedoff"
+    _insert_case(conn, done_id, "OND 2026 drought — Ruvuma (completed activation)", "READY_FOR_REVIEW", assessment, evidence, created_at, version=4)
     _insert_tasks(conn, done_id, assessment, created_at, blocked=False)
-    append_event(conn, done_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Bungoma (completed activation)", "mode": "exercise"})
+    append_event(conn, done_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Ruvuma (completed activation)", "mode": "exercise"})
     append_event(conn, done_id, "system", "ASSESSED", {"stage": assessment["stage"], "gates_passed": True})
     _sign_all(conn, done_id)
     conn.execute("UPDATE decision_cases SET state = 'APPROVED' WHERE id = ?", (done_id,))
@@ -203,10 +208,10 @@ def seed_cases(conn: Any) -> None:
     append_event(conn, done_id, "usr_david", "STATE_CHANGED", {"from": "APPROVED", "to": "HANDED_OFF", "reason": "handed to authorised operators"})
 
     # 3. A revoked activation showing the stop-trigger path.
-    revoked_id = "case_bungoma_ond2026_revoked"
-    _insert_case(conn, revoked_id, "OND 2026 drought — Bungoma (revoked by stop trigger)", "READY_FOR_REVIEW", assessment, evidence, created_at, version=5)
+    revoked_id = "case_ruvuma_ond2026_revoked"
+    _insert_case(conn, revoked_id, "OND 2026 drought — Ruvuma (revoked by stop trigger)", "READY_FOR_REVIEW", assessment, evidence, created_at, version=5)
     _insert_tasks(conn, revoked_id, assessment, created_at, blocked=False)
-    append_event(conn, revoked_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Bungoma (revoked by stop trigger)", "mode": "exercise"})
+    append_event(conn, revoked_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Ruvuma (revoked by stop trigger)", "mode": "exercise"})
     append_event(conn, revoked_id, "system", "ASSESSED", {"stage": assessment["stage"], "gates_passed": True})
     _sign_all(conn, revoked_id)
     conn.execute("UPDATE decision_cases SET state = 'APPROVED' WHERE id = ?", (revoked_id,))

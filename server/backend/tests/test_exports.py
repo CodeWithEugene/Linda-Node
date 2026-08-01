@@ -29,8 +29,8 @@ from app.husika_contract import validate as validate_husika
 from app.main import app
 from app.services import get_case
 
-PUBLISHED = "case_bungoma_ond2026_handedoff"
-BLOCKED = "case_bungoma_ond2026"
+PUBLISHED = "case_ruvuma_ond2026_handedoff"
+BLOCKED = "case_ruvuma_ond2026"
 CAP_NS = {"cap": "urn:oasis:names:tc:emergency:cap:1.2"}
 
 
@@ -113,9 +113,9 @@ def test_cap_carries_the_gadm_geocode(seeded: None) -> None:
         case = get_case(conn, PUBLISHED)
     document = etree.fromstring(cap_xml(case))
     area = document.find("cap:info/cap:area", CAP_NS)
-    assert area.find("cap:areaDesc", CAP_NS).text == "Bungoma"
+    assert area.find("cap:areaDesc", CAP_NS).text == "Ruvuma"
     assert area.find("cap:geocode/cap:valueName", CAP_NS).text == "GADM"
-    assert area.find("cap:geocode/cap:value", CAP_NS).text == "KEN.3_1"
+    assert area.find("cap:geocode/cap:value", CAP_NS).text == "TZA.22_1"
 
 
 def test_cap_severity_maps_from_the_stage(seeded: None) -> None:
@@ -135,7 +135,7 @@ def test_the_public_feed_only_lists_published_activations(seeded: None) -> None:
     with connection() as conn:
         feed = published_cap_feed(conn).decode()
     assert PUBLISHED in feed
-    assert "case_bungoma_ond2026_revoked" in feed
+    assert "case_ruvuma_ond2026_revoked" in feed
     assert feed.count("<entry") == 2
 
 

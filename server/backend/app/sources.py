@@ -38,11 +38,26 @@ RAW_RESPONSE_PREVIEW_CHARS = 120_000
 
 SOURCE_LABELS = {
     "triggers": "ICPAC Thresholds & Triggers — rules, events, actions, check logs",
-    "forecasts": "ICPAC seasonal return-period forecast catalogue and admin statistics",
-    "areas": "ICPAC GADM admin-1 boundaries",
+    "forecasts": "ICPAC seasonal return-period forecast statistics for every GHA admin-1 unit",
+    "areas": "ICPAC GADM admin-1 index for the 11 Greater Horn of Africa countries",
+    "indicators": "ICPAC indicator registry (which indicators support forecasting)",
     "pipeline": "ibf-thresholds-triggers exceedance-probability CSV",
 }
-SOURCE_ORDER = ("triggers", "forecasts", "areas", "pipeline")
+SOURCE_ORDER = ("triggers", "forecasts", "areas", "indicators", "pipeline")
+
+# The 11 countries ICPAC publishes admin-1 statistics for.
+GHA_COUNTRIES: tuple[tuple[str, str], ...] = (
+    ("KEN", "Kenya"), ("ETH", "Ethiopia"), ("SOM", "Somalia"), ("SSD", "South Sudan"),
+    ("SDN", "Sudan"), ("DJI", "Djibouti"), ("ERI", "Eritrea"), ("UGA", "Uganda"),
+    ("TZA", "Tanzania"), ("RWA", "Rwanda"), ("BDI", "Burundi"),
+)
+COUNTRY_NAMES = dict(GHA_COUNTRIES)
+
+# ICPAC's public pg_tileserv catalogue. Vector tiles are served from
+# /tileserv/{layer}/{z}/{x}/{y}.pbf and carry the GADM id in `gid_1`, which is
+# the same join key as the statistics endpoint.
+TILE_LAYER = "boundary.gadm_41_admin_level_1_boundary"
+TILE_JOIN_PROPERTY = "gid_1"
 
 
 def _schema(name: str) -> Draft202012Validator:
@@ -77,6 +92,19 @@ def set_replay_step(conn: sqlite3.Connection, step: int) -> int:
         (str(step),),
     )
     return step
+
+
+def forecast_issue(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute("SELECT value FROM app_settings WHERE key = 'forecast_issue'").fetchone()
+    return row["value"] if row and row["value"] else None
+
+
+def set_forecast_issue(conn: sqlite3.Connection, issue_id: str | None) -> str | None:
+    conn.execute(
+        "INSERT INTO app_settings (key,value) VALUES ('forecast_issue',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (issue_id or "",),
+    )
+    return issue_id
 
 
 def set_source_mode(conn: sqlite3.Connection, mode: str) -> str:
@@ -205,12 +233,15 @@ def normalise_forecasts(available_raw: Any, stats_raw: Any) -> dict[str, Any]:
     for item in stats:
         if not isinstance(item, dict):
             continue
+        admin_id = item.get("admin_id") or ""
         probability = round(float(item.get("avg_prob_rp3") or 0) / 100, 4)
         forecasts.append({
-            "id": f"{issue.get('id', 'forecast')}-{item.get('admin_id')}",
+            "id": f"{issue.get('id', 'forecast')}-{admin_id}",
             "name": f"{issue.get('target_season', 'Season')} {issue.get('target_year', '')} return-period exceedance".strip(),
-            "area_id": item.get("admin_id"),
+            "area_id": admin_id,
             "area_name": item.get("admin_name"),
+            "country": admin_id.split(".")[0],
+            "country_name": COUNTRY_NAMES.get(admin_id.split(".")[0], item.get("parent_name")),
             "hazard": "drought",
             "indicator": indicator,
             "probability": min(max(probability, 0.0), 1.0),
@@ -219,9 +250,33 @@ def normalise_forecasts(available_raw: Any, stats_raw: Any) -> dict[str, Any]:
             "valid_date": issue.get("valid_date"),
             "severity": "moderate" if probability >= 0.35 else "low",
             "probability_source": "ICPAC /api/datasets/forecasts/stats/ avg_prob_rp3 (percent) ÷ 100",
+            "return_periods": {
+                key: round(float(item.get(f"avg_prob_{key}") or 0) / 100, 4)
+                for key in ("rp3", "rp5", "rp10", "rp20", "rp50")
+                if item.get(f"avg_prob_{key}") is not None
+            },
+            "pixels": item.get("total_pixels"),
         })
     forecasts.sort(key=lambda item: item["probability"], reverse=True)
-    return {"forecasts": forecasts, "issues": issues}
+    return {"forecasts": forecasts, "issues": issues, "issue": issue}
+
+
+def normalise_indicators(raw: Any) -> dict[str, Any]:
+    """ICPAC's own indicator registry: which indicators can actually be forecast."""
+    return {"indicators": [
+        {
+            "code": item.get("full_code") or item.get("code"),
+            "name": item.get("name"),
+            "category": item.get("category_code"),
+            "data_source": item.get("data_source_code"),
+            "unit": item.get("unit"),
+            "description": item.get("description"),
+            "supports_forecast": bool(item.get("supports_forecast")),
+            "supports_monitoring": bool(item.get("supports_monitoring")),
+            "timescale_months": item.get("timescale_months"),
+        }
+        for item in _results(raw)
+    ]}
 
 
 def normalise_areas(raw: Any) -> dict[str, Any]:
@@ -236,14 +291,24 @@ def normalise_areas(raw: Any) -> dict[str, Any]:
             level = int(properties.get("level", 1))
         except (TypeError, ValueError):
             level = 1
+        country = str(identifier).split(".")[0]
         areas.append({
             "id": str(identifier),
             "name": properties.get("name") or str(identifier),
-            "country": str(identifier).split(".")[0],
+            "country": country,
+            "country_name": COUNTRY_NAMES.get(country, country),
             "level": level,
             "geometry": feature.get("geometry"),
         })
     return {"areas": areas}
+
+
+def merge_areas(payloads: list[dict[str, Any]]) -> dict[str, Any]:
+    merged: dict[str, dict[str, Any]] = {}
+    for payload in payloads:
+        for area in payload.get("areas", []):
+            merged[area["id"]] = area
+    return {"areas": sorted(merged.values(), key=lambda item: item["id"])}
 
 
 def parse_pipeline_csv(text: str, *, source_file: str) -> dict[str, Any]:
@@ -328,6 +393,20 @@ def _prune_raw(conn: sqlite3.Connection, adapter: str) -> None:
     )
 
 
+def _store_with_key(
+    conn: sqlite3.Connection,
+    adapter: str,
+    logical_key: str,
+    endpoint: str,
+    payload: dict[str, Any],
+    freshness: str,
+    *,
+    raw_parts: dict[str, str],
+    meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _store(conn, adapter, endpoint, payload, freshness, raw_parts=raw_parts, meta=meta, logical_key=logical_key)
+
+
 def _store(
     conn: sqlite3.Connection,
     adapter: str,
@@ -337,6 +416,7 @@ def _store(
     *,
     raw_parts: dict[str, str],
     meta: dict[str, Any] | None = None,
+    logical_key: str | None = None,
 ) -> dict[str, Any]:
     """Persist one snapshot. The recorded hash covers the verbatim upstream body."""
     raw_document = canonical_json(raw_parts)
@@ -351,7 +431,7 @@ def _store(
         "payload_sha256": sha256(raw_document),
         "schema_ok": 0 if errors else 1,
         "freshness": freshness,
-        "logical_key": adapter,
+        "logical_key": logical_key or adapter,
         "meta_json": canonical_json({
             **(meta or {}),
             "label": SOURCE_LABELS.get(adapter, adapter),
@@ -368,7 +448,7 @@ def _store(
         VALUES (:id,:adapter,:endpoint_url,:retrieved_at,:payload_json,:payload_raw,:payload_sha256,:schema_ok,:freshness,:logical_key,:meta_json)""",
         item,
     )
-    _prune_raw(conn, adapter)
+    _prune_raw(conn, logical_key or adapter)
     return _hydrate(item)
 
 
@@ -397,6 +477,10 @@ def _replay(conn: sqlite3.Connection, adapter: str, mode: str, reason: str | Non
         raw = json.loads(text)
         payload = normalise_triggers(raw.get("rules"), raw.get("events"), raw.get("actions"), raw.get("check_logs"))
         return _store(conn, adapter, location, payload, "replay", raw_parts={location: text}, meta=meta)
+    if adapter == "indicators":
+        text, location = _fixture_text("indicators.json")
+        return _store(conn, adapter, location, normalise_indicators(json.loads(text)), "replay",
+                      raw_parts={location: text}, meta={**meta, "synthetic": False})
     if adapter == "forecasts":
         step = replay_step(conn)
         name = f"escalation/step{step}.json" if step else "forecasts.json"
@@ -407,6 +491,17 @@ def _replay(conn: sqlite3.Connection, adapter: str, mode: str, reason: str | Non
                       meta={**meta, "escalation_step": step, "provenance": raw.get("_provenance", {})})
     text, location = _fixture_text("areas.json")
     return _store(conn, adapter, location, normalise_areas(json.loads(text)), "replay", raw_parts={location: text}, meta=meta)
+
+
+def _forecast_issue(available: Any, requested: str | None = None) -> dict[str, Any]:
+    issues = _results(available)
+    if not issues:
+        return {}
+    if requested:
+        chosen = next((item for item in issues if str(item.get("id")) == requested), None)
+        if chosen:
+            return chosen
+    return next((item for item in issues if item.get("target_season") == "OND"), issues[0])
 
 
 def _fetch_live(conn: sqlite3.Connection, adapter: str, mode: str) -> dict[str, Any]:
@@ -422,24 +517,45 @@ def _fetch_live(conn: sqlite3.Connection, adapter: str, mode: str) -> dict[str, 
         payload = normalise_triggers(*(bodies[name][1] for name in ("rules", "events", "actions", "check_logs")))
         raw_parts = {urls[name]: bodies[name][0] for name in urls}
         return _store(conn, adapter, urls["rules"], payload, "live", raw_parts=raw_parts, meta={"mode": mode})
+
     if adapter == "forecasts":
+        # One unfiltered call returns every GHA admin-1 unit for the issue, so
+        # the regional view is a single upstream request rather than eleven.
         available_url = f"{base}/api/datasets/forecasts/available/?forecast_type=return_period"
         available_text, available = _get(available_url)
-        issues = _results(available)
-        issue = next((item for item in issues if item.get("target_season") == "OND"), issues[0] if issues else {})
+        issue = _forecast_issue(available, forecast_issue(conn))
         stats_url = (
             f"{base}/api/datasets/forecasts/stats/?admin_level=1"
             f"&valid_date={issue.get('valid_date', '2026-10-01')}"
-            f"&lead_months={issue.get('lead_months', 3)}&min_probability=0&country=KEN"
+            f"&lead_months={issue.get('lead_months', 3)}&min_probability=0"
         )
         stats_text, stats = _get(stats_url)
         payload = normalise_forecasts(available, stats)
         return _store(conn, adapter, stats_url, payload, "live",
-                      raw_parts={available_url: available_text, stats_url: stats_text}, meta={"mode": mode})
+                      raw_parts={available_url: available_text, stats_url: stats_text},
+                      meta={"mode": mode, "issue_id": issue.get("id"), "coverage": "all GHA countries"})
+
     if adapter == "areas":
-        url = f"{base}/api/areas/areas/?level=1&code=KEN"
+        # `fields=id,name` returns the admin-1 index without geometry (a few KB
+        # per country instead of megabytes); geometry is fetched per country on
+        # demand by area_geometry().
+        raw_parts: dict[str, str] = {}
+        payloads = []
+        for iso3, _ in GHA_COUNTRIES:
+            url = f"{base}/api/areas/areas/?level=1&code={iso3}&fields=id,name"
+            text, raw = _get(url)
+            raw_parts[url] = text
+            payloads.append(normalise_areas(raw))
+        payload = merge_areas(payloads)
+        return _store(conn, adapter, f"{base}/api/areas/areas/?level=1&fields=id,name", payload, "live",
+                      raw_parts=raw_parts,
+                      meta={"mode": mode, "countries": [iso3 for iso3, _ in GHA_COUNTRIES], "geometry": "on demand"})
+
+    if adapter == "indicators":
+        url = f"{base}/api/datasets/indicators/"
         text, raw = _get(url)
-        return _store(conn, adapter, url, normalise_areas(raw), "live", raw_parts={url: text}, meta={"mode": mode})
+        return _store(conn, adapter, url, normalise_indicators(raw), "live", raw_parts={url: text}, meta={"mode": mode})
+
     raise ValueError(f"{adapter} has no live endpoint")
 
 
@@ -451,9 +567,15 @@ def refresh_adapter(conn: sqlite3.Connection, adapter: str, force: bool = False)
     # Changing the escalation step or the source mode must produce a new
     # snapshot rather than silently reusing the cached one. Snapshots stay
     # append-only; only the cache-hit condition is narrowed.
-    stale_selection = bool(cached) and mode == "replay_only" and (
-        cached["freshness"] != "replay"
-        or (adapter == "forecasts" and cached["meta"].get("escalation_step", 0) != replay_step(conn))
+    stale_selection = bool(cached) and (
+        (mode == "replay_only" and (
+            cached["freshness"] != "replay"
+            or (adapter == "forecasts" and cached["meta"].get("escalation_step", 0) != replay_step(conn))
+        ))
+        # A different published forecast issue is different evidence, not a
+        # cache hit on the same query.
+        or (adapter == "forecasts" and mode != "replay_only" and forecast_issue(conn)
+            and cached["meta"].get("issue_id") != forecast_issue(conn))
     )
     if cached and _fresh(cached) and not force and not stale_selection:
         cached["freshness"] = "cached" if cached["freshness"] != "replay" else "replay"
@@ -557,3 +679,50 @@ def latest_probability(conn: sqlite3.Connection, area_id: str, indicator: str | 
                     "freshness": snapshot["freshness"],
                 }
     return None
+
+
+def area_geometry(conn: sqlite3.Connection, country: str) -> dict[str, Any]:
+    """Admin-1 geometry for one country, cached as its own snapshot.
+
+    The full GADM payload is megabytes per country, so the regional index keeps
+    geometry out and callers pull only the country they are drawing.
+    """
+    country = country.upper()
+    if country not in COUNTRY_NAMES:
+        raise ValueError(f"{country} is not a Greater Horn of Africa country published by ICPAC")
+    key = f"areas_geom:{country}"
+    row = conn.execute(
+        "SELECT * FROM source_snapshots WHERE logical_key = ? ORDER BY retrieved_at DESC, id DESC LIMIT 1", (key,)
+    ).fetchone()
+    if row:
+        snapshot = _hydrate(row)
+        if _fresh(snapshot):
+            return {"country": country, "areas": snapshot["payload"].get("areas", []), "snapshot_id": snapshot["id"], "freshness": "cached"}
+    mode = source_mode(conn)
+    if mode != "replay_only":
+        try:
+            url = f"{settings.icpac_base}/api/areas/areas/?level=1&code={country}"
+            text, raw = _get(url)
+            payload = normalise_areas(raw)
+            item = _store_with_key(conn, "areas", key, url, payload, "live", raw_parts={url: text}, meta={"mode": mode, "country": country})
+            return {"country": country, "areas": payload["areas"], "snapshot_id": item["id"], "freshness": "live"}
+        except (httpx.HTTPError, ValueError, KeyError, json.JSONDecodeError):
+            pass
+    text, location = _fixture_text("areas.json")
+    payload = normalise_areas(json.loads(text))
+    areas = [item for item in payload["areas"] if item["country"] == country]
+    return {"country": country, "areas": areas, "snapshot_id": None, "freshness": "replay"}
+
+
+def tile_source() -> dict[str, Any]:
+    """ICPAC's public pg_tileserv admin-1 layer, joined on the same GADM id."""
+    return {
+        "layer": TILE_LAYER,
+        "catalog_url": f"{settings.icpac_base}/tileserv/index.json",
+        "tile_url": f"{settings.icpac_base}/tileserv/{TILE_LAYER}/{{z}}/{{x}}/{{y}}.pbf",
+        "source_layer": TILE_LAYER,
+        "join_property": TILE_JOIN_PROPERTY,
+        "attribution": "Boundaries: GADM 4.1 via ICPAC pg_tileserv",
+        "min_zoom": 0,
+        "max_zoom": 12,
+    }

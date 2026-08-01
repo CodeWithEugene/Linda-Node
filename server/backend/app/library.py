@@ -40,11 +40,23 @@ def _check(validator: Draft202012Validator, document: Any, label: str) -> None:
         raise PolicyInvalid(f"{label} failed schema validation — {'; '.join(errors[:5])}")
 
 
-@lru_cache(maxsize=1)
-def _policy_document() -> dict[str, Any]:
-    raw, parsed = _read_yaml(Path(CONTENT_ROOT) / "policy.yaml")
-    _check(_validator("policy"), parsed, "policy.yaml")
-    return {"id": sha256(raw), "raw": raw, "data": parsed, "name": "policy.yaml", "schema_valid": True}
+HAZARDS = ("drought", "heat", "flood")
+
+
+@lru_cache(maxsize=len(HAZARDS))
+def _policy_document(hazard: str) -> dict[str, Any]:
+    path = Path(CONTENT_ROOT) / "policies" / f"{hazard}.yaml"
+    if not path.exists():
+        raise PolicyInvalid(f"No policy is published for hazard '{hazard}'")
+    raw, parsed = _read_yaml(path)
+    _check(_validator("policy"), parsed, path.name)
+    if parsed["policy"]["hazard"] != hazard:
+        raise PolicyInvalid(f"{path.name} declares hazard '{parsed['policy']['hazard']}'")
+    return {
+        "id": sha256(raw), "raw": raw, "data": parsed, "name": path.name,
+        "hazard": hazard, "schema_valid": True,
+        "signal_basis": parsed["policy"].get("signal_basis", "probability"),
+    }
 
 
 @lru_cache(maxsize=1)
@@ -64,8 +76,13 @@ def _action_card_documents() -> tuple[dict[str, Any], ...]:
     return tuple(cards)
 
 
-def policy() -> dict[str, Any]:
-    return dict(_policy_document())
+def policy(hazard: str = "drought") -> dict[str, Any]:
+    """The reviewed, hash-pinned rulebook for one hazard."""
+    return dict(_policy_document(hazard))
+
+
+def policies() -> list[dict[str, Any]]:
+    return [policy(hazard) for hazard in HAZARDS]
 
 
 def action_cards() -> list[dict[str, Any]]:
@@ -78,5 +95,9 @@ def card_by_id(card_id: str) -> dict[str, Any] | None:
 
 def validate_library() -> dict[str, Any]:
     """Called at application startup so a bad rulebook fails loudly and early."""
-    document = policy()
-    return {"policy_version_id": document["id"], "action_cards": len(action_cards()), "schema_valid": True}
+    documents = policies()
+    return {
+        "policies": {item["hazard"]: item["id"] for item in documents},
+        "action_cards": len(action_cards()),
+        "schema_valid": True,
+    }

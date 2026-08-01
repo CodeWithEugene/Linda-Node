@@ -15,8 +15,8 @@ from app.library import PolicyInvalid
 from app.main import app
 
 XSS = "<script>alert('linda')</script>"
-BLOCKED = "case_bungoma_ond2026"
-PUBLISHED = "case_bungoma_ond2026_handedoff"
+BLOCKED = "case_ruvuma_ond2026"
+PUBLISHED = "case_ruvuma_ond2026_handedoff"
 
 
 @pytest.fixture()
@@ -92,11 +92,11 @@ def test_passwords_are_never_returned(client: TestClient) -> None:
 def test_an_invalid_policy_refuses_to_load(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     library._policy_document.cache_clear()
     broken = tmp_path / "content"
-    (broken / "actions").mkdir(parents=True)
-    (broken / "policy.yaml").write_text("policy:\n  name: broken\n", encoding="utf-8")
+    (broken / "policies").mkdir(parents=True)
+    (broken / "policies" / "drought.yaml").write_text("policy:\n  name: broken\n", encoding="utf-8")
     monkeypatch.setattr(library, "CONTENT_ROOT", broken)
-    with pytest.raises(PolicyInvalid, match="policy.yaml failed schema validation"):
-        library.policy()
+    with pytest.raises(PolicyInvalid, match="drought.yaml failed schema validation"):
+        library.policy("drought")
     library._policy_document.cache_clear()
 
 
@@ -117,3 +117,4 @@ def test_the_shipped_library_is_valid() -> None:
     report = library.validate_library()
     assert report["schema_valid"] is True
     assert report["action_cards"] == 6
+    assert set(report["policies"]) == {"drought", "heat", "flood"}

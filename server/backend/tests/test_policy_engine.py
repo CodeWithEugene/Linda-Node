@@ -14,7 +14,7 @@ from app.policy_engine import (
     observed_signal,
 )
 
-AREA = "KEN.3_1"
+AREA = "TZA.22_1"
 INDICATOR = "spi3_chirps_forecast"
 STAGES = policy()["data"]["policy"]["stages"]
 
@@ -23,7 +23,7 @@ def forecast_snapshot(probability: float, *, quantile: float = 0.33, lead_months
     return {
         "adapter": "forecasts", "schema_ok": True, "retrieved_at": retrieved_at,
         "payload": {"forecasts": [{
-            "id": "f1", "name": "test", "area_id": area, "area_name": "Bungoma", "hazard": "drought",
+            "id": "f1", "name": "test", "area_id": area, "area_name": "Ruvuma", "hazard": "drought",
             "indicator": INDICATOR, "probability": probability, "quantile": quantile,
             "lead_months": lead_months, "probability_source": "unit test",
         }]},

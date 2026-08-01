@@ -18,6 +18,7 @@ from .library import action_cards, policy
 
 STAGE_ORDER = {"ready": 1, "set": 2, "go": 3}
 DEFAULT_FRESHNESS_MAX_DAYS = 45
+ACTIVE_EVENT_STATES = {"active", "ongoing", ""}
 
 
 def _is_synthetic(snapshot: dict[str, Any]) -> bool:
@@ -79,6 +80,48 @@ def observed_signal(snapshots: list[dict[str, Any]], area_id: str | None, indica
     }
 
 
+def observed_event(snapshots: list[dict[str, Any]], area_id: str | None, hazard: str) -> dict[str, Any]:
+    """The most severe *active* upstream trigger event for this area and hazard.
+
+    Heat and rainfall are monitoring-only indicators upstream, so readiness for
+    those hazards follows ICPAC's own detected events. Linda maps their severity
+    to a stage; it never classifies severity itself.
+    """
+    candidates = [
+        record for record in _records(snapshots, "events")
+        if record.get("hazard") == hazard
+        and (area_id is None or record.get("area_id") == area_id)
+        and str(record.get("status", "active")).lower() in ACTIVE_EVENT_STATES
+    ]
+    if not candidates:
+        return {"severity": None, "value": None, "threshold_value": None, "source": None, "synthetic": False, "active": False}
+    best = max(candidates, key=lambda item: (not item.get("_synthetic"), _severity_rank(item.get("severity"))))
+    synthetic = bool(best.get("_synthetic"))
+    citation = f"ICPAC trigger event {best.get('id')} severity_level={best.get('severity')}"
+    return {
+        "severity": best.get("severity"),
+        "value": best.get("value"),
+        "threshold_value": best.get("threshold_value"),
+        "indicator": best.get("indicator"),
+        "detected_at": best.get("detected_at"),
+        "active": True,
+        "adapter": best.get("_adapter"),
+        "freshness": best.get("_freshness"),
+        "synthetic": synthetic,
+        "source": f"SYNTHETIC demo fixture — {citation}" if synthetic else citation,
+    }
+
+
+_SEVERITY_ORDER = ("low", "minor", "moderate", "high", "major", "severe", "extreme", "critical")
+
+
+def _severity_rank(value: str | None) -> int:
+    try:
+        return _SEVERITY_ORDER.index(str(value or "").lower())
+    except ValueError:
+        return -1
+
+
 def detect_compound_signals(snapshots: list[dict[str, Any]], area_id: str | None, hazard: str, stage: str | None) -> list[str]:
     """Deterministic overlap check, NOT a scientific index (build.md 6.9).
 
@@ -99,8 +142,25 @@ def detect_compound_signals(snapshots: list[dict[str, Any]], area_id: str | None
     return sorted(active) if len(active) > 1 else []
 
 
-def evaluate_stop_trigger(policy_document: dict[str, Any], observed_probability: float | None) -> dict[str, Any]:
+def evaluate_stop_trigger(
+    policy_document: dict[str, Any],
+    observed_probability: float | None,
+    *,
+    upstream_active: bool | None = None,
+) -> dict[str, Any]:
+    """Both stop-trigger shapes: a collapsing probability, or a resolved event."""
     condition = policy_document["stop_trigger"]["condition"]
+    checked = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    if condition.get("resolved_upstream"):
+        fired = upstream_active is False
+        return {
+            "armed": True,
+            "condition": "upstream trigger event no longer active",
+            "indicator": condition["on_indicator"],
+            "observed": upstream_active,
+            "fired": bool(fired),
+            "last_checked": checked,
+        }
     threshold = float(condition["probability_lt"])
     fired = observed_probability is not None and observed_probability < threshold
     return {
@@ -109,36 +169,56 @@ def evaluate_stop_trigger(policy_document: dict[str, Any], observed_probability:
         "indicator": condition["on_indicator"],
         "observed": observed_probability,
         "fired": bool(fired),
-        "last_checked": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "last_checked": checked,
     }
 
 
 def evaluate(snapshots: list[dict[str, Any]], hazard: str, area_id: str | None = None) -> dict[str, Any]:
-    document = policy()["data"]["policy"]
-    signal = observed_signal(snapshots, area_id)
-    probability = signal["probability"]
-    quantile = signal["quantile"]
-    lead_months = signal["lead_months"] or 0
+    document_wrapper = policy(hazard)
+    document = document_wrapper["data"]["policy"]
+    basis = document_wrapper["signal_basis"]
+
+    if basis == "upstream_severity":
+        signal = observed_event(snapshots, area_id, hazard)
+        probability, quantile, lead_months = None, None, 0
+    else:
+        signal = observed_signal(snapshots, area_id)
+        probability = signal["probability"]
+        quantile = signal["quantile"]
+        lead_months = signal["lead_months"] or 0
 
     stage: str | None = None
     trace = []
     for name, definition in document["stages"].items():
         condition = definition["condition"]
-        if probability is None or quantile is None:
-            passed = False
-            detail = "no observed probability for this area in the attached evidence"
-        else:
-            passed = (
-                probability >= condition["probability_gte"]
-                and quantile <= condition["quantile"]
-                and lead_months >= condition.get("min_lead_months", 0)
+        if basis == "upstream_severity":
+            allowed = [str(item).lower() for item in condition["upstream_severity_in"]]
+            observed_value = signal.get("severity")
+            passed = bool(signal.get("active")) and str(observed_value or "").lower() in allowed
+            readable = f"ICPAC severity_level ∈ {{{', '.join(allowed)}}}"
+            detail = (
+                f"upstream event severity_level={observed_value}"
+                if signal.get("active") else "no active upstream trigger event for this area"
             )
-            detail = f"observed P={probability:.3f} @q{quantile} with {lead_months} months lead"
+        else:
+            observed_value = probability
+            if probability is None or quantile is None:
+                passed = False
+                detail = "no observed probability for this area in the attached evidence"
+            else:
+                passed = (
+                    probability >= condition["probability_gte"]
+                    and quantile <= condition["quantile"]
+                    and lead_months >= condition.get("min_lead_months", 0)
+                )
+                detail = f"observed P={probability:.3f} @q{quantile} with {lead_months} months lead"
+            readable = f"P ≥ {condition['probability_gte']} @q≤{condition['quantile']}" + (
+                f", lead ≥ {condition['min_lead_months']}m" if condition.get("min_lead_months") else ""
+            )
         trace.append({
             "stage": name,
-            "condition": f"P ≥ {condition['probability_gte']} @q≤{condition['quantile']}"
-                         + (f", lead ≥ {condition['min_lead_months']}m" if condition.get("min_lead_months") else ""),
-            "observed": probability,
+            "condition": readable,
+            "observed": observed_value,
             "detail": detail,
             "passed": passed,
         })
@@ -148,7 +228,8 @@ def evaluate(snapshots: list[dict[str, Any]], hazard: str, area_id: str | None =
     cards = [card for card in action_cards() if card["hazard"] == hazard]
     eligible: list[dict[str, Any]] = []
     ineligible: list[dict[str, Any]] = []
-    available_days = lead_months * 30
+    # Monitoring-driven hazards act on an observed onset; the seasonal lead does not apply.
+    available_days = lead_months * 30 if basis == "probability" else max(card["lead_time_days"] for card in action_cards())
     for card in cards:
         if stage is None:
             ineligible.append({"card": card["id"], "reason": "no stage reached — no activation recommended"})
@@ -216,7 +297,10 @@ def evaluate(snapshots: list[dict[str, Any]], hazard: str, area_id: str | None =
     ]
 
     return {
-        "policy_version_id": policy()["id"],
+        "policy_version_id": document_wrapper["id"],
+        "policy_name": document["name"],
+        "signal_basis": basis,
+        "hazard": hazard,
         "stage": stage,
         "ndma_phase": document["ndma_phase_mapping"][stage] if stage else None,
         "recommendation": "no activation recommended" if stage is None else f"activation readiness at {stage.upper()}",
@@ -241,7 +325,11 @@ def evaluate(snapshots: list[dict[str, Any]], hazard: str, area_id: str | None =
                     "source": "policy_assumption" if signal.get("synthetic") else "official_source",
                     "citation": signal["source"] or "no observation",
                 },
-                {"field": "exposed_households", "source": "policy_assumption", "citation": exposure["citation"]},
+                {
+                    "field": "exposed_households",
+                    "source": "official_source" if exposure.get("source") == "official_source" else "policy_assumption",
+                    "citation": exposure["citation"],
+                },
                 {"field": "loss_per_household_usd", "source": "policy_assumption", "citation": "policy.yaml cost_loss"},
                 {"field": "effectiveness", "source": "policy_assumption", "citation": "action card effectiveness"},
             ],
@@ -249,5 +337,5 @@ def evaluate(snapshots: list[dict[str, Any]], hazard: str, area_id: str | None =
         "eligible_action_cards": [card["id"] for card in eligible],
         "ineligible": ineligible,
         "compound_signals": detect_compound_signals(snapshots, area_id, hazard, stage),
-        "stop_trigger": evaluate_stop_trigger(document, probability),
+        "stop_trigger": evaluate_stop_trigger(document, probability, upstream_active=signal.get("active")),
     }

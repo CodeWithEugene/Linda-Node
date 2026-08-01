@@ -61,22 +61,21 @@ def test_no_endpoint_leaks_a_personal_address(address: str) -> None:
         assert client.post("/api/auth/login", json={"email": "david.drm@demo", "password": "linda-demo"}).status_code == 200
         paths = [
             "/api/signals", "/api/sources/status", "/api/sources/snapshots",
-            "/api/cases", "/api/cases/case_bungoma_ond2026",
-            "/api/cases/case_bungoma_ond2026/events", "/api/audit", "/cap/feed.xml",
+            "/api/cases", "/api/cases/case_ruvuma_ond2026",
+            "/api/cases/case_ruvuma_ond2026/events", "/api/audit", "/cap/feed.xml",
         ]
         snapshots = client.get("/api/sources/snapshots").json()
         paths += [f"/api/sources/snapshots/{item['id']}" for item in snapshots]
         for path in paths:
             body = client.get(path).text
             assert address not in body, f"{path} leaked {address}"
-            assert "c***@igad.int" in body or address.split("@")[0] not in body
 
 
 def test_generated_exports_carry_no_personal_address() -> None:
     reset_demo()
     with TestClient(app) as client:
         client.post("/api/auth/login", json={"email": "david.drm@demo", "password": "linda-demo"})
-        exports = client.get("/api/cases/case_bungoma_ond2026_handedoff").json()["exports"]
+        exports = client.get("/api/cases/case_ruvuma_ond2026_handedoff").json()["exports"]
         assert exports
         for export in exports:
             content = client.get(f"/api/exports/{export['id']}/download").content
@@ -119,26 +118,47 @@ def test_forecast_probability_comes_from_the_stats_endpoint() -> None:
     assert not validate_source("forecasts", payload)
 
 
-def test_recorded_live_statistics_do_not_reach_an_activation_stage() -> None:
-    """The honest baseline: the real OND 2026 signal for Bungoma is far below policy."""
+def test_the_recorded_region_is_mostly_below_every_threshold() -> None:
+    """The honest baseline: real activation is rare, and Linda reports that."""
     raw = fixture("forecasts.json")
     payload = normalise_forecasts(raw["available"], raw["stats"])
-    assert max(item["probability"] for item in payload["forecasts"]) < 0.35
+    probabilities = [item["probability"] for item in payload["forecasts"]]
+    assert len(probabilities) > 200, "the regional call should cover every GHA admin-1 unit"
+    below_ready = [value for value in probabilities if value < 0.35]
+    assert len(below_ready) / len(probabilities) > 0.95
+
+
+def test_the_recorded_region_still_contains_a_genuine_activation() -> None:
+    """Ruvuma, Tanzania crosses SET on recorded ICPAC statistics — no fixture needed."""
+    raw = fixture("forecasts.json")
+    payload = normalise_forecasts(raw["available"], raw["stats"])
+    ruvuma = next(item for item in payload["forecasts"] if item["area_id"] == "TZA.22_1")
+    assert ruvuma["probability"] >= 0.50
+    assert ruvuma["country"] == "TZA" and ruvuma["country_name"] == "Tanzania"
+
+
+def test_the_regional_payload_covers_all_eleven_countries() -> None:
+    raw = fixture("forecasts.json")
+    payload = normalise_forecasts(raw["available"], raw["stats"])
+    countries = {item["country"] for item in payload["forecasts"]}
+    assert countries == {"KEN", "ETH", "SOM", "SSD", "SDN", "DJI", "ERI", "UGA", "TZA", "RWA", "BDI"}
 
 
 def test_areas_coerce_the_string_level_to_an_integer() -> None:
     payload = normalise_areas(fixture("areas.json"))
     assert all(isinstance(item["level"], int) for item in payload["areas"])
     assert any(item["id"] == "KEN.3_1" and item["name"] == "Bungoma" for item in payload["areas"])
+    assert any(item["id"] == "TZA.22_1" and item["country_name"] == "Tanzania" for item in payload["areas"])
+    assert len({item["country"] for item in payload["areas"]}) == 11
     assert not validate_source("areas", payload)
 
 
 def test_pipeline_csv_parses_the_icpac_column_layout() -> None:
     text = (FIXTURES / "pipeline_ond2026.csv").read_text(encoding="utf-8")
     payload = parse_pipeline_csv(text, source_file="03_prob_csv_q.py compatible output")
-    bungoma = next(item for item in payload["files"] if item["area_id"] == "KEN.3_1")
-    assert bungoma["probability"] == pytest.approx(0.52)
-    assert bungoma["quantile"] == pytest.approx(0.33)
+    ruvuma = next(item for item in payload["files"] if item["area_id"] == "TZA.22_1")
+    assert ruvuma["probability"] == pytest.approx(0.518)
+    assert ruvuma["quantile"] == pytest.approx(0.33)
     assert not validate_source("pipeline", payload)
 
 

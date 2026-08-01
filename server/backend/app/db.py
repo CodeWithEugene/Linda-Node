@@ -425,7 +425,7 @@ def init_db() -> None:
         _migrate(conn)
         if conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"] == 0:
             seed_demo(conn)
-        for key, value in (("source_mode", "live_first"), ("replay_step", "2")):
+        for key, value in (("source_mode", "live_first"), ("replay_step", "0")):
             if not conn.execute("SELECT 1 FROM app_settings WHERE key = ?", (key,)).fetchone():
                 conn.execute("INSERT INTO app_settings (key,value) VALUES (?,?)", (key, value))
 
