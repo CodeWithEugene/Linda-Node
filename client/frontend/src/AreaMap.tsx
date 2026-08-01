@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { GeoJSONSource, LngLatBounds, Map, MapLayerMouseEvent, NavigationControl } from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import { Alert, Box, Typography } from '@mui/material'
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps'
+import { useMemo, useState } from 'react'
+import { Box, Button, Stack, Typography } from '@mui/material'
+import worldAtlas from 'world-atlas/countries-110m.json'
 
 type Area = { id: string; name: string; geometry: GeoJSON.Geometry; country?: string; level?: number }
 type Signal = { area_id: string; severity?: string; name: string }
+type MapPosition = { coordinates: [number, number]; zoom: number }
+
+const kenyaCenter: [number, number] = [37.9, 0.2]
+const viewportCenter: [number, number] = [0, 0]
 
 const severityColor = (severity = '') => {
   const normalized = severity.toLowerCase()
@@ -13,92 +17,49 @@ const severityColor = (severity = '') => {
   return '#1b5e20'
 }
 
+export const areaCentroid = (geometry: GeoJSON.Geometry): [number, number] | null => {
+  const positions: GeoJSON.Position[] = geometry.type === 'Polygon'
+    ? geometry.coordinates.flat(1)
+    : geometry.type === 'MultiPolygon'
+      ? geometry.coordinates.flat(2)
+      : []
+  if (!positions.length) return null
+  const [longitude, latitude] = positions.reduce(([totalLongitude, totalLatitude], [lng, lat]) => [totalLongitude + lng, totalLatitude + lat], [0, 0])
+  return [longitude / positions.length, latitude / positions.length]
+}
+
 export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signals: Signal[]; onAreaSelect?: (area: Area) => void }) {
-  const container = useRef<HTMLDivElement | null>(null)
-  const map = useRef<Map | null>(null)
-  const selectArea = useRef(onAreaSelect)
-  const [tilesUnavailable, setTilesUnavailable] = useState(false)
-  const [mapReady, setMapReady] = useState(false)
-  const [basemapReady, setBasemapReady] = useState(false)
-  const fallbackMapUrl = useMemo(() => 'https://www.openstreetmap.org/export/embed.html?bbox=33.9%2C-0.2%2C35.3%2C1.7&layer=mapnik&marker=0.75%2C34.6', [])
+  const [position, setPosition] = useState<MapPosition>({ coordinates: viewportCenter, zoom: 5 })
+  const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
+  const affectedAreas = useMemo(() => areas.flatMap((area) => {
+    const coordinates = areaCentroid(area.geometry)
+    if (!coordinates) return []
+    const areaSignals = signals.filter((signal) => signal.area_id === area.id)
+    const topSeverity = areaSignals.map((signal) => signal.severity || '').sort((a, b) => severityColor(b).localeCompare(severityColor(a)))[0]
+    return [{ area, coordinates, color: severityColor(topSeverity), signalCount: areaSignals.length }]
+  }), [areas, signals])
 
-  useEffect(() => { selectArea.current = onAreaSelect }, [onAreaSelect])
-
-  useEffect(() => {
-    if (!container.current || map.current) return
-    let fallbackTimer: number | undefined
-    try {
-      const instance = new Map({
-        container: container.current,
-        center: [37.9, 0.2],
-        zoom: 5.2,
-        style: {
-          version: 8,
-          sources: {
-            openstreetmap: {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              maxzoom: 19,
-              attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
-            },
-          },
-          layers: [{ id: 'openstreetmap', type: 'raster', source: 'openstreetmap' }],
-        },
-      })
-      instance.addControl(new NavigationControl({ showCompass: false }), 'top-right')
-      instance.on('error', () => setTilesUnavailable(true))
-      instance.on('sourcedata', (event) => {
-        if (event.sourceId === 'openstreetmap' && event.isSourceLoaded) {
-          setBasemapReady(true)
-          setTilesUnavailable(false)
-        }
-      })
-      instance.on('load', () => {
-        instance.addSource('linda-areas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-        instance.addLayer({ id: 'linda-area-fill', type: 'fill', source: 'linda-areas', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': .35 } })
-        instance.addLayer({ id: 'linda-area-outline', type: 'line', source: 'linda-areas', paint: { 'line-color': ['get', 'color'], 'line-width': 2 } })
-        instance.on('mouseenter', 'linda-area-fill', () => { instance.getCanvas().style.cursor = 'pointer' })
-        instance.on('mouseleave', 'linda-area-fill', () => { instance.getCanvas().style.cursor = '' })
-        instance.on('click', 'linda-area-fill', (event: MapLayerMouseEvent) => {
-          const feature = event.features?.[0]
-          if (!feature) return
-          const area = areas.find((item) => item.id === feature.properties?.id)
-          if (area) selectArea.current?.(area)
-        })
-        setMapReady(true)
-      })
-      fallbackTimer = window.setTimeout(() => setTilesUnavailable(true), 4_500)
-      map.current = instance
-      return () => { if (fallbackTimer) window.clearTimeout(fallbackTimer); instance.remove(); map.current = null; setMapReady(false); setBasemapReady(false) }
-    } catch {
-      setTilesUnavailable(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    const instance = map.current
-    if (!instance?.isStyleLoaded()) return
-    const source = instance.getSource('linda-areas') as GeoJSONSource | undefined
-    if (!source) return
-    const data: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: areas.map((area) => {
-        const areaSignals = signals.filter((signal) => signal.area_id === area.id)
-        const topSeverity = areaSignals.map((signal) => signal.severity || '').sort((a, b) => severityColor(b).localeCompare(severityColor(a)))[0]
-        return { type: 'Feature', properties: { id: area.id, name: area.name, signal_count: areaSignals.length, color: severityColor(topSeverity) }, geometry: area.geometry }
-      }),
-    }
-    source.setData(data)
-    if (areas.length) {
-      const bounds = new LngLatBounds()
-      for (const area of areas) {
-        const coordinates = area.geometry.type === 'Polygon' ? area.geometry.coordinates.flat(2) : area.geometry.type === 'MultiPolygon' ? area.geometry.coordinates.flat(3) : []
-        for (let index = 0; index < coordinates.length; index += 2) bounds.extend([Number(coordinates[index]), Number(coordinates[index + 1])])
-      }
-      if (!bounds.isEmpty()) instance.fitBounds(bounds, { padding: 36, maxZoom: 8, duration: 0 })
-    }
-  }, [areas, signals, mapReady])
-
-  return <Box sx={{ position: 'relative', height: 300, borderRadius: 1, overflow: 'hidden', bgcolor: 'grey.100' }}><Box component="iframe" title="OpenStreetMap of affected areas" src={fallbackMapUrl} loading="eager" sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} /><Box ref={container} aria-label="Interactive signal areas map" sx={{ position: 'absolute', inset: 0, opacity: basemapReady ? 1 : 0, pointerEvents: basemapReady ? 'auto' : 'none', transition: 'opacity 160ms ease' }} />{tilesUnavailable && <Alert severity="info" sx={{ position: 'absolute', top: 8, left: 8, right: 8 }}>Showing the OpenStreetMap fallback while the interactive area overlay is unavailable.</Alert>}<Typography variant="caption" sx={{ position: 'absolute', left: 8, bottom: 8, bgcolor: 'rgba(255,255,255,.88)', px: .75, py: .25, borderRadius: .5 }}>Click an area to prepare a case.</Typography></Box>
+  const resetView = () => setPosition({ coordinates: viewportCenter, zoom: 5 })
+  return <Box sx={{ position: 'relative', height: 300, borderRadius: 1, overflow: 'hidden', bgcolor: '#e8f0ed', border: 1, borderColor: 'divider' }}>
+    <ComposableMap aria-label="Interactive affected areas map" width={800} height={460} projection="geoMercator" projectionConfig={{ center: kenyaCenter, scale: 1450 }} style={{ width: '100%', height: '100%' }}>
+      <ZoomableGroup center={position.coordinates} zoom={position.zoom} minZoom={3} maxZoom={12} onMoveEnd={({ coordinates, zoom }) => setPosition({ coordinates, zoom })}>
+        <Geographies geography={worldAtlas}>
+          {({ geographies }) => geographies.map((geography) => {
+            const isKenya = geography.properties.name === 'Kenya'
+            return <Geography key={geography.rsmKey} geography={geography} style={{ default: { fill: isKenya ? '#d4e7d6' : '#f7faf8', stroke: '#aebbb3', strokeWidth: .65, outline: 'none' }, hover: { fill: isKenya ? '#c2ddc7' : '#eef4f0', stroke: '#80958a', strokeWidth: .75, outline: 'none' }, pressed: { fill: '#bad7bf', outline: 'none' } }} />
+          })}
+        </Geographies>
+        {affectedAreas.map(({ area, coordinates, color, signalCount }) => {
+          const isHovered = hoveredAreaId === area.id
+          return <Marker key={area.id} coordinates={coordinates} onMouseEnter={() => setHoveredAreaId(area.id)} onMouseLeave={() => setHoveredAreaId(null)} onClick={() => onAreaSelect?.(area)} style={{ default: { cursor: 'pointer', outline: 'none' }, hover: { cursor: 'pointer', outline: 'none' }, pressed: { cursor: 'pointer', outline: 'none' } }}>
+            <circle r={isHovered ? 13 : 10} fill={color} fillOpacity={.18} stroke={color} strokeWidth={isHovered ? 3 : 2} />
+            <circle r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+            {(isHovered || signalCount > 0) && <g pointerEvents="none"><rect x={12} y={-22} width={Math.max(78, area.name.length * 7.3)} height={24} rx={4} fill="#13291c" opacity={.94} /><text x={18} y={-6} fill="#fff" fontSize="11" fontFamily="system-ui, sans-serif">{area.name} · {signalCount}</text></g>}
+          </Marker>
+        })}
+      </ZoomableGroup>
+    </ComposableMap>
+    <Stack direction="row" spacing={1} sx={{ position: 'absolute', top: 8, right: 8 }}><Button size="small" variant="contained" color="inherit" onClick={() => setPosition((current) => ({ ...current, zoom: Math.min(current.zoom + 1, 12) }))}>+</Button><Button size="small" variant="contained" color="inherit" onClick={() => setPosition((current) => ({ ...current, zoom: Math.max(current.zoom - 1, 3) }))}>−</Button><Button size="small" variant="contained" color="inherit" onClick={resetView}>Reset</Button></Stack>
+    <Typography variant="caption" sx={{ position: 'absolute', left: 8, bottom: 8, bgcolor: 'rgba(255,255,255,.92)', px: .75, py: .25, borderRadius: .5, pointerEvents: 'none' }}>Drag to pan · scroll or use controls to zoom · select an affected area.</Typography>
+  </Box>
 }
