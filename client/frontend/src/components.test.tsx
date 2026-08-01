@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ThemeProvider } from '@mui/material/styles'
 
 import { FreshnessBadge, StageChip, StateChip, freshnessColor, meterColor, money, relativeTime, severityColor, severityRank } from './components'
+import { RouteErrorBoundary } from './ErrorBoundary'
 import { themeFor } from './theme'
 
 const render = (node: React.ReactNode) => renderToStaticMarkup(<ThemeProvider theme={themeFor('light')}>{node}</ThemeProvider>)
@@ -71,5 +72,31 @@ describe('formatting', () => {
   it('degrades gracefully without a timestamp', () => {
     expect(relativeTime(undefined)).toBe('—')
     expect(relativeTime(new Date().toISOString())).toBe('just now')
+  })
+})
+
+describe('RouteErrorBoundary', () => {
+  // Error boundaries only catch during client rendering, so exercise the
+  // boundary's own logic and its rendered output directly.
+  it('captures a thrown error into state', () => {
+    expect(RouteErrorBoundary.getDerivedStateFromError(new Error('geometry is null')))
+      .toEqual({ error: new Error('geometry is null') })
+  })
+
+  it('names the failure instead of leaving a blank screen', () => {
+    const boundary = new RouteErrorBoundary({ children: null, routeKey: '/signals' })
+    boundary.state = { error: new Error('geometry is null') }
+    const markup = renderToStaticMarkup(
+      <ThemeProvider theme={themeFor('light')}>{boundary.render()}</ThemeProvider>,
+    )
+    expect(markup).toContain('This screen could not render')
+    expect(markup).toContain('geometry is null')
+    expect(markup).toContain('Retry')
+  })
+
+  it('passes children straight through when nothing has thrown', () => {
+    const boundary = new RouteErrorBoundary({ children: <span>content</span>, routeKey: '/' })
+    boundary.state = { error: null }
+    expect(renderToStaticMarkup(<>{boundary.render()}</>)).toContain('content')
   })
 })

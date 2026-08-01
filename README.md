@@ -247,7 +247,7 @@ GET /integration/v1/activations/{id}/verify    server-side recomputation of ever
 
 ```bash
 curl --request GET \
-  --url 'https://linda-protocol.vercel.app/integration/v1/activations?state=APPROVED' \
+  --url 'https://linda-node.vercel.app/integration/v1/activations?state=APPROVED' \
   --header 'Authorization: Bearer linda_your_api_key'
 ```
 
@@ -391,7 +391,7 @@ Copy [`server/backend/.env.example`](server/backend/.env.example) to `server/bac
 
 **Docker (one container).** `server/backend/Dockerfile` installs WeasyPrint's native dependencies; CI bakes the built SPA into `/app/static`, which FastAPI serves with SPA fallback. `docker compose up` then `:8000` works from a clean clone.
 
-**Vercel (two projects, currently in production).** The React client is served at `linda-protocol.vercel.app`; its server-side proxy forwards `/api`, `/cap`, and `/integration` to the FastAPI project at `linda-protocol-api.vercel.app`, keeping the HTTP-only session cookie on the frontend origin.
+**Vercel (two projects, currently in production).** The React client is served at `linda-node.vercel.app`; its server-side proxy forwards `/api`, `/cap`, and `/integration` to the FastAPI project at `linda-protocol-api.vercel.app`, keeping the HTTP-only session cookie on the frontend origin. (The API project keeps its original hostname; renaming it would require re-pointing `LINDA_API_ORIGIN` and re-issuing partner keys.)
 
 The API project's root directory is `server/backend`; `api/index.py` runs FastAPI as a Vercel Function, Neon Postgres holds workflow state, and private Vercel Blob holds generated exports. Configure `LINDA_SECRET`, `COOKIE_SECURE=true`, `PUBLIC_BASE_URL`, `CORS_ORIGINS`, `DATABASE_URL`, and `LINDA_BLOB_READ_WRITE_TOKEN`. Configure the frontend project with `LINDA_API_ORIGIN` and redeploy after changing it.
 

@@ -5,7 +5,7 @@
 <h1 align="center">4-minute demo script</h1>
 
 <p align="center">
-  <strong>URL:</strong> <code>https://linda-protocol.vercel.app</code> · <strong>password for every persona:</strong> <code>linda-demo</code>
+  <strong>URL:</strong> <code>https://linda-node.vercel.app</code> · <strong>password for every persona:</strong> <code>linda-demo</code>
 </p>
 
 ---
@@ -18,7 +18,7 @@
    - Window **C** → `grace.ngo@demo` (NGO & Finance Lead)
 2. In **Window A**, sit on the landing page (`/`) with the map loaded.
 3. In **Window B and C**, pre-navigate to `/cases/case_ruvuma_ond2026?tab=approvals`.
-4. Have a fourth tab ready on `https://linda-protocol.vercel.app/integration/v1/docs`.
+4. Have a fourth tab ready on `https://linda-node.vercel.app/integration/v1/docs`.
 5. If anything looks stale, sign in as `admin@demo` and hit **Restore seed data**, then **Refresh** on the landing page. Takes about 10 seconds.
 
 **Numbers you should know cold:** 214 admin-1 units · 11 countries · 3 activating · Ruvuma 51.8 % · 13 forecast issues available.

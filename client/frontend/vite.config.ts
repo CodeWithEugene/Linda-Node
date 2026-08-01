@@ -26,9 +26,11 @@ export default defineConfig(({ mode }) => {
       host: '127.0.0.1',
       port: 5173,
       proxy: {
-        '/api': apiOrigin,
-        '/cap': apiOrigin,
-        '/integration': apiOrigin,
+        // Anchored so an app route such as /integrations is not mistaken for
+        // the /integration/v1 partner API.
+        '^/api/': apiOrigin,
+        '^/cap/': apiOrigin,
+        '^/integration/': apiOrigin,
       },
     },
   }

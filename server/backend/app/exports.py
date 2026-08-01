@@ -26,6 +26,7 @@ from .library import policy
 from .services import case_events, get_case, verify_approvals, verify_event_chain
 
 CAP_NS = "urn:oasis:names:tc:emergency:cap:1.2"
+CAP_SENDER = "linda-protocol-demo"
 ET.register_namespace("", CAP_NS)
 CAP_XSD_PATH = Path(CONTENT_ROOT).parents[0] / "fixtures" / "cap" / "cap12.xsd"
 CAP_SCHEMA = etree.XMLSchema(etree.parse(str(CAP_XSD_PATH)))
@@ -150,7 +151,9 @@ def cap_xml(case: dict[str, Any], cancel: bool = False) -> bytes:
     tag = lambda name: f"{{{CAP_NS}}}{name}"
     alert = ET.Element(tag("alert"))
     cap_time = now().replace("Z", "+00:00")
-    fields = {"identifier": case["id"], "sender": "linda-protocol-demo", "sent": cap_time, "status": "Exercise", "msgType": "Cancel" if cancel else "Alert", "scope": "Restricted", "restriction": "hackathon demonstration"}
+    # CAP_SENDER is deliberately stable across the product rename: it is the
+    # identifier already present in published alerts and partner-side records.
+    fields = {"identifier": case["id"], "sender": CAP_SENDER, "sent": cap_time, "status": "Exercise", "msgType": "Cancel" if cancel else "Alert", "scope": "Restricted", "restriction": "exercise activation record"}
     for key, value in fields.items(): ET.SubElement(alert, tag(key)).text = value
     info = ET.SubElement(alert, tag("info"))
     stage = case.get("stage") or "ready"

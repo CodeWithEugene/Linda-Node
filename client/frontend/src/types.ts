@@ -40,6 +40,9 @@ export type Signal = {
   snapshot_id: string
   freshness: Freshness
   source_adapter: string
+  /** Which inbox group this record came from; makes React keys unique because
+   *  a rule and an event can share an upstream id. */
+  kind?: Exclude<SignalKind, 'all'>
   probability_source?: string
   valid_date?: string
 }

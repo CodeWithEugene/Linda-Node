@@ -41,15 +41,22 @@ export function RegionalMap({ tiles, units, selectedCountry, onSelect, height = 
 }) {
   const container = useRef<HTMLDivElement | null>(null)
   const map = useRef<MapLibreMap | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [unsupported] = useState(() => {
+    try {
+      const probe = document.createElement('canvas')
+      return !(probe.getContext('webgl2') || probe.getContext('webgl'))
+    } catch {
+      return true
+    }
+  })
+  const [failed, setFailed] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!container.current || map.current) return
+    if (unsupported || !container.current || map.current) return
     const instance = new maplibregl.Map({
       container: container.current,
       style: {
         version: 8,
-        glyphs: undefined,
         sources: {
           carto: {
             type: 'raster',
@@ -89,15 +96,22 @@ export function RegionalMap({ tiles, units, selectedCountry, onSelect, height = 
     })
     instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     instance.on('error', (event) => {
-      // A tile failure must not blank the screen; the ranking beside it is the product.
-      if (String(event?.error?.message ?? '').includes('icpac')) setFailed(true)
+      // Never swallow an error: a blank map with no explanation is worse than
+      // a visible one. The ranking beside the map is unaffected either way.
+      const message = String(event?.error?.message ?? event?.error ?? 'unknown map error')
+      // eslint-disable-next-line no-console
+      console.error('[RegionalMap]', message)
+      setFailed(message)
     })
+    instance.on('load', () => setFailed(null))
     map.current = instance
     return () => {
       instance.remove()
       map.current = null
     }
-  }, [tiles])
+    // `tiles` is a stable descriptor from the API; the map is built once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tiles.tile_url, tiles.source_layer, tiles.min_zoom, tiles.max_zoom])
 
   // Data-driven colour: one `match` expression keyed on the GADM id in the tile.
   useEffect(() => {
@@ -172,11 +186,19 @@ export function RegionalMap({ tiles, units, selectedCountry, onSelect, height = 
     }
   }, [units, onSelect, tiles.join_property])
 
+  if (unsupported) {
+    return (
+      <Alert severity="info">
+        This browser has WebGL disabled, so the map cannot render. Every unit is still listed and rankable beside it.
+      </Alert>
+    )
+  }
+
   return (
     <Box>
       {failed && (
         <Alert severity="warning" sx={{ mb: 1 }}>
-          ICPAC&rsquo;s tile server did not respond. The ranking beside the map is unaffected.
+          The map could not draw ({failed.slice(0, 120)}). The ranking beside it is unaffected.
         </Alert>
       )}
       <Box

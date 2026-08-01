@@ -310,7 +310,10 @@ export function InboxPage() {
   const grouped = useMemo(() => {
     const data = signals.data
     if (!data) return [] as Signal[]
-    const all = kind === 'all' ? [...data.rules, ...data.events, ...data.forecasts, ...data.pipeline] : data[kind]
+    const tagged = (items: Signal[], group: Exclude<SignalKind, 'all'>) => items.map((item) => ({ ...item, kind: group }))
+    const all = kind === 'all'
+      ? [...tagged(data.rules, 'rules'), ...tagged(data.events, 'events'), ...tagged(data.forecasts, 'forecasts'), ...tagged(data.pipeline, 'pipeline')]
+      : tagged(data[kind], kind)
     return [...all]
       .filter((item) => (!areaFilter || item.area_id === areaFilter) && (!attentionOnly || needsAttention(item)))
       .sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || (b.probability ?? 0) - (a.probability ?? 0))
@@ -320,6 +323,23 @@ export function InboxPage() {
     const data = signals.data
     return data ? [...data.rules, ...data.events, ...data.forecasts, ...data.pipeline] : []
   }, [signals.data])
+
+  // Geometry is not part of the admin-1 index, so pull it for the countries
+  // that actually have a signal on this screen.
+  const countries = useMemo(
+    () => Array.from(new Set(everySignal.map((item) => (item.area_id || '').split('.')[0]).filter(Boolean))).sort(),
+    [everySignal],
+  )
+  const geometry = useQuery({
+    queryKey: ['area-geometry', countries],
+    enabled: countries.length > 0,
+    queryFn: async () => {
+      const results = await Promise.all(
+        countries.slice(0, 4).map((iso3) => api<{ areas: Area[] }>(`/api/areas/${iso3}/geometry`).catch(() => ({ areas: [] }))),
+      )
+      return results.flatMap((item) => item.areas)
+    },
+  })
 
   const snapshotById = useMemo(
     () => new Map((status.data?.sources ?? []).map((item) => [item.id, item])),
@@ -443,7 +463,7 @@ export function InboxPage() {
                 <Stack spacing={1}>
                   {grouped.map((signal) => (
                     <SignalRow
-                      key={`${signal.source_adapter}-${signal.id}`}
+                      key={`${signal.kind}-${signal.source_adapter}-${signal.id}`}
                       signal={signal}
                       snapshot={snapshotById.get(signal.snapshot_id)}
                       onInspect={() => inspect(signal)}
@@ -467,13 +487,13 @@ export function InboxPage() {
                 titleTypographyProps={{ variant: 'subtitle1', fontWeight: 700 }}
               />
               <CardContent sx={{ pt: 0 }}>
-                {areas.isLoading ? (
+                {geometry.isLoading ? (
                   <Skeleton variant="rounded" height={380} />
-                ) : areas.error ? (
-                  <ErrorPanel error={areas.error} retry={() => areas.refetch()} />
+                ) : geometry.error ? (
+                  <ErrorPanel error={geometry.error} retry={() => geometry.refetch()} />
                 ) : (
                   <AreaMap
-                    areas={areas.data ?? []}
+                    areas={geometry.data ?? []}
                     signals={everySignal}
                     height={380}
                     onAreaSelect={(area) => setAreaFilter((current) => (current === area.id ? null : area.id))}

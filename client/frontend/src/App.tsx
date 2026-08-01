@@ -44,6 +44,7 @@ import Public from '@mui/icons-material/Public'
 import Source from '@mui/icons-material/Source'
 import { api } from './api'
 import { ProvenanceLegend } from './components'
+import { RouteErrorBoundary } from './ErrorBoundary'
 import { Logo, LogoMark } from './Logo'
 import { SessionProvider, useSession } from './session'
 import { themeFor, ThemePreference } from './theme'
@@ -84,6 +85,7 @@ export function App() {
 
 function RouteGate(props: { preference: ThemePreference; setPreference: (value: ThemePreference) => void }) {
   const { user, loading, connectionError } = useSession()
+  const location = useLocation()
   if (loading) {
     return <Box minHeight="100vh" display="grid" sx={{ placeItems: 'center' }}><CircularProgress aria-label="Loading session" /></Box>
   }
@@ -107,21 +109,23 @@ function RouteGate(props: { preference: ThemePreference; setPreference: (value: 
   }
   return (
     <Shell {...props}>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/" element={<RegionalPage />} />
-          <Route path="/signals" element={<InboxPage />} />
-          <Route path="/cases" element={<CasesPage />} />
-          <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-          <Route path="/audit" element={<AuditPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/sources" element={<SourcesPage />} />
-          <Route path="/integrations" element={<IntegrationsPage />} />
-          <Route path="/developers" element={<DeveloperDocsPage />} />
-          <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <RouteErrorBoundary routeKey={location.pathname}>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<RegionalPage />} />
+            <Route path="/signals" element={<InboxPage />} />
+            <Route path="/cases" element={<CasesPage />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+            <Route path="/audit" element={<AuditPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
+            <Route path="/developers" element={<DeveloperDocsPage />} />
+            <Route path="/admin" element={user.role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </RouteErrorBoundary>
     </Shell>
   )
 }
