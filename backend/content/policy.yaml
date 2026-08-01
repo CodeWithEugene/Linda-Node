@@ -1,0 +1,23 @@
+policy_id: linda-ond-drought-v1
+title: OND drought activation policy
+version: 1.0.0
+hazard: drought
+area_scope: KEN.3_1
+stages:
+  set:
+    probability_threshold: 0.45
+  go:
+    probability_threshold: 0.60
+gates:
+  - official_source
+  - probability_threshold
+  - readiness
+approval_roles:
+  - ews_specialist
+  - county_drm_officer
+  - ngo_finance_lead
+stop_triggers:
+  - forecast confidence below continuation threshold
+audit:
+  canonical_digest: sha256
+  event_chain: sha256

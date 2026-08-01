@@ -1,0 +1,11 @@
+id: water-trucking
+title: Pre-position water trucking contracts
+hazard: drought
+stage: go
+owner_role: county_drm_officer
+budget:
+  currency: USD
+  amount: 100000
+readiness_tasks:
+  - transport contracts confirmed
+stop_condition: forecast confidence below continuation threshold

@@ -1,0 +1,8 @@
+id: seed-distribution
+title: Seed distribution
+hazard: drought
+stage: go
+owner_role: county_drm_officer
+eligibility:
+  requires_lead_time_days: 45
+ineligibility_reason: lead time exceeds available window
