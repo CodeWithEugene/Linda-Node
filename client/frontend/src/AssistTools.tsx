@@ -128,25 +128,49 @@ function Chatbot() {
         <Box role="dialog" aria-modal="true" aria-labelledby="linda-guide-title" sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
         <DialogTitle id="linda-guide-title" sx={{ pr: 7, py: 1.5 }}>
           Linda Guide
-          <IconButton onClick={() => setOpen(false)} aria-label="Close Linda Guide" sx={{ position: 'absolute', right: 12, top: 10 }}><Close /></IconButton>
+          <IconButton onClick={() => setOpen(false)} aria-label="Close Linda Guide" sx={{ position: 'absolute', right: 12, top: 10, color: 'text.primary' }}><Close /></IconButton>
         </DialogTitle>
         <Box sx={{ borderTop: 1, borderBottom: 1, borderColor: 'divider', maxHeight: 345, overflowY: 'auto', p: 2 }}>
           <Stack spacing={1.25} aria-live="polite" aria-label="Linda Guide conversation">
             {messages.map((message, index) => (
-              <Paper key={`${message.from}-${index}`} elevation={0} sx={{ p: 1.25, alignSelf: message.from === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%', bgcolor: message.from === 'user' ? 'primary.dark' : 'grey.100', color: message.from === 'user' ? 'primary.contrastText' : 'text.primary', border: 1, borderColor: message.from === 'user' ? 'primary.dark' : 'divider' }}>
-                <Typography variant="body2">{message.text}</Typography>
+              <Paper
+                key={`${message.from}-${index}`}
+                elevation={0}
+                sx={{
+                  p: 1.25,
+                  alignSelf: message.from === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '92%',
+                  bgcolor: (theme) => message.from === 'user' ? '#145A1F' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, .12)' : '#EEF4EF',
+                  color: message.from === 'user' ? '#FFFFFF' : 'text.primary',
+                  border: 1,
+                  borderColor: (theme) => message.from === 'user' ? '#145A1F' : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, .30)' : '#C9D7CB',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                <Typography variant="body2" sx={{ color: 'inherit', lineHeight: 1.5 }}>{message.text}</Typography>
               </Paper>
             ))}
           </Stack>
           {messages.length === 1 && (
             <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 2 }}>
-              {QUICK_QUESTIONS.map((item) => <Button key={item} variant="outlined" onClick={() => ask(item)}>{item}</Button>)}
+              {QUICK_QUESTIONS.map((item) => <Button key={item} variant="outlined" onClick={() => ask(item)} sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#A5D6A7' : '#145A1F', borderColor: (theme) => theme.palette.mode === 'dark' ? '#81C784' : '#4E7B55' }}>{item}</Button>)}
             </Stack>
           )}
         </Box>
-        <Alert severity="info" sx={{ m: 1.5 }}>Workspace guidance only—not emergency or operational advice.</Alert>
+        <Alert severity="info" sx={{ m: 1.5, bgcolor: (theme) => theme.palette.mode === 'dark' ? '#0D2E45' : '#E1F3FB', color: (theme) => theme.palette.mode === 'dark' ? '#E3F2FD' : '#073B62', '& .MuiAlert-icon': { color: (theme) => theme.palette.mode === 'dark' ? '#90CAF9' : '#0369A1' } }}>Workspace guidance only—not emergency or operational advice.</Alert>
         <Box component="form" onSubmit={submit} sx={{ display: 'flex', gap: 1, px: 2, pb: 2 }}>
-          <TextField inputRef={inputRef} fullWidth label="Ask a question" value={question} onChange={(event) => setQuestion(event.target.value)} />
+          <TextField
+            inputRef={inputRef}
+            fullWidth
+            label="Ask a question"
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            sx={{
+              '& .MuiInputLabel-root, & .MuiInputLabel-root.Mui-focused': { color: (theme) => theme.palette.mode === 'dark' ? '#C8E6C9' : '#145A1F' },
+              '& .MuiInputBase-input': { color: 'text.primary' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: (theme) => theme.palette.mode === 'dark' ? '#90A4AE' : '#52715A' },
+            }}
+          />
           <IconButton color="primary" type="submit" disabled={!question.trim()} aria-label="Send question"><Send /></IconButton>
         </Box>
         </Box>
