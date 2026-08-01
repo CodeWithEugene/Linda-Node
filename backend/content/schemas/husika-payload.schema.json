@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Husika-ready exercise payload",
+  "type": "object",
+  "required": ["mode", "case_id", "area", "hazard", "language", "message", "does_not_dispatch"],
+  "properties": {
+    "mode": {"const": "exercise"},
+    "language": {"enum": ["en", "sw"]},
+    "does_not_dispatch": {"const": true}
+  }
+}
