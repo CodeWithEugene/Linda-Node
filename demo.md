@@ -23,6 +23,18 @@
 
 **Numbers you should know cold:** 214 admin-1 units · 11 countries · 3 activating · Ruvuma 51.8 % · 13 forecast issues available.
 
+## 0:00 – 0:12 · Help and accessibility
+
+**Screen:** the landing page, before beginning the main story.
+
+> "Before we get into the workflow, the two controls in the lower-right keep the workspace usable for more people. The chat icon opens Linda Guide: ask how the workspace handles evidence, cases, approvals, sources, and accessibility. It gives bounded product guidance rather than operational or emergency advice."
+
+*(Click the chat icon, ask “How do approvals work?”, then close it.)*
+
+> "The accessibility icon saves personal display preferences on this device: larger text, higher contrast, and reduced motion. The underlying interface also supports keyboard navigation and screen readers — these controls are preferences, not a substitute for accessible design."
+
+*(Click the accessibility icon, enable **Larger text** briefly, then switch it back off before the rest of the demo.)*
+
 ---
 
 ## 0:00 – 0:35 · The gap

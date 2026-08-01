@@ -7,3 +7,7 @@ body { min-width: 320px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .mono { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
 .dashed-ai { border: 1px dashed #0d47a1; }
+
+html.large-text { font-size: 118%; }
+html.high-contrast { filter: contrast(1.25); }
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }

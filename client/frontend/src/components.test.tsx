@@ -4,6 +4,7 @@ import { ThemeProvider } from '@mui/material/styles'
 
 import { FreshnessBadge, StageChip, StateChip, freshnessColor, meterColor, money, relativeTime, severityColor, severityRank } from './components'
 import { RouteErrorBoundary } from './ErrorBoundary'
+import { answerGuideQuestion } from './AssistTools'
 import { themeFor } from './theme'
 
 const render = (node: React.ReactNode) => renderToStaticMarkup(<ThemeProvider theme={themeFor('light')}>{node}</ThemeProvider>)
@@ -98,5 +99,13 @@ describe('RouteErrorBoundary', () => {
     const boundary = new RouteErrorBoundary({ children: <span>content</span>, routeKey: '/' })
     boundary.state = { error: null }
     expect(renderToStaticMarkup(<>{boundary.render()}</>)).toContain('content')
+  })
+})
+
+describe('Linda Guide', () => {
+  it('answers common workspace questions with bounded guidance', () => {
+    expect(answerGuideQuestion('How do approvals work?')).toContain('Approvals tab')
+    expect(answerGuideQuestion('What data is used?')).toContain('ICPAC')
+    expect(answerGuideQuestion('Can you give emergency advice?')).toContain('I can help with')
   })
 })

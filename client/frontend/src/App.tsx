@@ -43,6 +43,7 @@ import Policy from '@mui/icons-material/Policy'
 import Public from '@mui/icons-material/Public'
 import Source from '@mui/icons-material/Source'
 import { api } from './api'
+import { AssistTools } from './AssistTools'
 import { ProvenanceLegend } from './components'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { Logo, LogoMark } from './Logo'
@@ -77,6 +78,7 @@ export function App() {
       <BrowserRouter>
         <SessionProvider>
           <RouteGate preference={preference} setPreference={setPreference} />
+          <AssistTools />
         </SessionProvider>
       </BrowserRouter>
     </ThemeProvider>
