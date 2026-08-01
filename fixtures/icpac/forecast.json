@@ -1,8 +1,0 @@
-{
-  "source": "https://eatriggersthresholds.icpac.net/api/datasets/forecasts/",
-  "dataset": "OND 2026 return-period seasonal forecast",
-  "area_id": "KEN.3_1",
-  "probability": 0.63,
-  "season": "OND 2026",
-  "synthetic_demo_escalation": true
-}
