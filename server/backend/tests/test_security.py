@@ -83,6 +83,15 @@ def test_a_forged_session_cookie_is_rejected(client: TestClient) -> None:
     assert client.get("/api/me").status_code == 401
 
 
+def test_demo_reset_is_admin_only_and_has_no_legacy_public_route(client: TestClient) -> None:
+    assert client.post("/api/admin/seed").status_code == 401
+    login(client, "david.drm@demo")
+    assert client.post("/api/admin/seed").status_code == 403
+    login(client, "admin@demo")
+    assert client.post("/api/admin/seed").status_code == 200
+    assert client.post("/api/seed").status_code == 404
+
+
 def test_passwords_are_never_returned(client: TestClient) -> None:
     login(client, "david.drm@demo")
     body = client.get("/api/me").json()
