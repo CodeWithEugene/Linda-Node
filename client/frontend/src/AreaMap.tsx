@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { positionsFor } from './mapGeometry'
 
 type Area = { id: string; name: string; geometry: GeoJSON.Geometry; country?: string; level?: number }
-type Signal = { area_id: string; severity?: string; name: string }
+type Signal = { area_id: string; severity?: string; name: string; probability?: number }
 
 const kenyaCenter: [number, number] = [0.75, 34.6]
 
@@ -29,14 +29,14 @@ function FitAffectedAreas({ areas }: { areas: Area[] }) {
   return null
 }
 
-export function AreaMap({ areas, signals, onAreaSelect }: { areas: Area[]; signals: Signal[]; onAreaSelect?: (area: Area) => void }) {
+export function AreaMap({ areas, signals, onAreaSelect, height = 300 }: { areas: Area[]; signals: Signal[]; onAreaSelect?: (area: Area) => void; height?: number }) {
   const affectedAreas = useMemo(() => areas.map((area) => {
     const areaSignals = signals.filter((signal) => signal.area_id === area.id)
     const topSeverity = areaSignals.map((signal) => signal.severity || '').sort((a, b) => severityColor(b).localeCompare(severityColor(a)))[0]
     return { area, color: severityColor(topSeverity), signalCount: areaSignals.length }
   }), [areas, signals])
 
-  return <Box sx={{ position: 'relative', height: 300, borderRadius: 1, overflow: 'hidden', border: 1, borderColor: 'divider', bgcolor: '#dbeafe' }}>
+  return <Box sx={{ position: 'relative', height, borderRadius: 1, overflow: 'hidden', border: 1, borderColor: 'divider', bgcolor: '#dbeafe' }}>
     <MapContainer center={kenyaCenter} zoom={6} minZoom={4} maxZoom={14} scrollWheelZoom zoomControl style={{ height: '100%', width: '100%' }} aria-label="Interactive OpenStreetMap of affected areas">
       <TileLayer attribution="&copy; <a href=&quot;https://www.openstreetmap.org/copyright&quot;>OpenStreetMap</a> contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
       <FitAffectedAreas areas={areas} />

@@ -1,0 +1,5 @@
+admin_id,admin_name,season,indicator,quantile,probability,lead_months
+KEN.3_1,Bungoma,OND-2026,spi3_chirps_forecast,0.33,0.52,3
+KEN.25_1,Marsabit,OND-2026,spi3_chirps_forecast,0.33,0.024,3
+KEN.43_1,Turkana,OND-2026,spi3_chirps_forecast,0.33,0.020,3
+KEN.40_1,Tana River,OND-2026,spi3_chirps_forecast,0.33,0.031,3

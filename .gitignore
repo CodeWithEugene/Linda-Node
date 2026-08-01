@@ -27,3 +27,6 @@ __pycache__/
 # Local planning and research notes
 what-to-build.md
 research.md
+
+# Local runtime state (SQLite DB + generated exports)
+var/

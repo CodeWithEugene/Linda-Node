@@ -23,6 +23,7 @@ class Settings:
     http_timeout_s: float
     snapshot_ttl_min: int
     blob_read_write_token: str | None
+    serverless: bool
 
 
 def _database_path(database_url: str) -> Path | None:
@@ -63,6 +64,9 @@ def get_settings() -> Settings:
             or os.getenv("BLOB_READ_WRITE_TOKEN")
             or None
         ),
+        # Vercel sets VERCEL=1 in every function runtime. Background work that
+        # outlives the response is not delivered there, so retry pacing adapts.
+        serverless=bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")),
     )
 
 

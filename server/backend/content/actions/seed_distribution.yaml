@@ -4,7 +4,7 @@ title: Drought-tolerant seed distribution
 description: Arrange seed procurement and ward-level delivery in time for planting.
 owner_role: ngo_finance_lead
 supporting_roles: [county_drm_officer]
-lead_time_days: 75
+lead_time_days: 120
 stage_required: set
 budget:
   currency: USD

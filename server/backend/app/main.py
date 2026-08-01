@@ -56,9 +56,9 @@ from .services import (
     case_events,
     case_summary,
     create_case,
+    evaluate_stop_trigger_for_case,
     get_case,
     record_approval,
-    revoke_for_stop_trigger,
     transition_case,
     update_task,
     verify_approvals,
@@ -69,6 +69,8 @@ from .sources import (
     get_snapshot,
     list_snapshots,
     refresh_all,
+    replay_step,
+    set_replay_step,
     set_source_mode,
     signals,
     source_mode,
@@ -140,6 +142,10 @@ class SourceModeInput(BaseModel):
     mode: str
 
 
+class ReplayStepInput(BaseModel):
+    step: int = Field(ge=0, le=3)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
@@ -204,7 +210,11 @@ def me(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
 def sources_status(_: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     with transaction() as conn:
         snapshots = refresh_all(conn)
-        return {"mode": source_mode(conn), "sources": [{key: item[key] for key in ("id", "adapter", "endpoint_url", "retrieved_at", "payload_sha256", "schema_ok", "freshness", "meta")} for item in snapshots]}
+        return {
+            "mode": source_mode(conn),
+            "escalation_step": replay_step(conn),
+            "sources": [{key: item[key] for key in ("id", "adapter", "endpoint_url", "retrieved_at", "payload_sha256", "schema_ok", "freshness", "meta")} for item in snapshots],
+        }
 
 
 @app.post("/api/sources/refresh")
@@ -223,7 +233,7 @@ def source_snapshots(adapter: str | None = None, limit: int = Query(50, ge=1, le
 @app.get("/api/sources/snapshots/{snapshot_id}")
 def source_snapshot(snapshot_id: str, _: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     with connection() as conn:
-        try: return get_snapshot(conn, snapshot_id)
+        try: return get_snapshot(conn, snapshot_id, include_raw=True)
         except KeyError as exc: raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Source snapshot not found") from exc
 
 
@@ -433,11 +443,20 @@ def replay_mode(payload: SourceModeInput, _: dict[str, Any] = Depends(require_ro
     except ValueError as exc: raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 
+@app.post("/api/admin/replay-step")
+def replay_escalation_step(payload: ReplayStepInput, _: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, int]:
+    """Advance the labelled synthetic escalation used for the scripted demo."""
+    try:
+        with transaction() as conn: return {"step": set_replay_step(conn, payload.step)}
+    except ValueError as exc: raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
 @app.post("/api/admin/simulate-stop-trigger")
 def simulate_stop_trigger(payload: StopTriggerInput, background: BackgroundTasks, _: dict[str, Any] = Depends(require_role("admin"))) -> dict[str, Any]:
     with transaction() as conn:
-        case = revoke_for_stop_trigger(conn, payload.case_id, payload.observed_probability)
-    background.add_task(deliver_webhooks_for_case, payload.case_id, "activation.revoked")
+        case = evaluate_stop_trigger_for_case(conn, payload.case_id, payload.observed_probability)
+    if case["state"] == "REVOKED":
+        background.add_task(deliver_webhooks_for_case, payload.case_id, "activation.revoked")
     return case
 
 

@@ -16,12 +16,19 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import HTTPException, Request, status
 
+from .config import settings
 from .db import append_event, connection, hash_secret, transaction, verify_secret
 from .domain import canonical_json, loads, new_id, now
 from .exports import packet_manifest
 from .services import get_case, verify_approvals, verify_event_chain
 
 _key_requests: dict[str, deque[float]] = defaultdict(deque)
+
+# A serverless invocation ends when its response is sent, so long in-process
+# sleeps would silently drop every retry after the first. On Vercel we make one
+# prompt second attempt and record the outcome; a long-lived container gets the
+# full 1m/5m/25m backoff.
+WEBHOOK_BACKOFF_SECONDS: tuple[int, ...] = (0, 2) if settings.serverless else (0, 60, 300, 1500)
 
 
 def create_key(conn: sqlite3.Connection, label: str) -> dict[str, str]:
@@ -156,21 +163,37 @@ async def deliver_webhooks(case_id: str, event: str) -> None:
         payload = canonical_json(activation_record(conn, case_id)).encode()
         subscriptions = [dict(row) for row in conn.execute("SELECT * FROM webhook_subscriptions WHERE active = 1") if event in loads(row["events_json"], [])]
     for subscription in subscriptions:
-        delivery_id = new_id("delivery")
         signature = hmac.new(subscription["secret"].encode(), payload, "sha256").hexdigest()
-        for attempt, delay in enumerate((0, 60, 300, 1500), 1):
-            if delay: await asyncio.sleep(delay)
-            code: int | None = None; delivered = False
+        for attempt, delay in enumerate(WEBHOOK_BACKOFF_SECONDS, 1):
+            if delay:
+                await asyncio.sleep(delay)
+            # The delivery id is both the stored row id and the X-Linda-Delivery
+            # header, so a receiver can correlate a request with its audit row.
+            delivery_id = new_id("delivery")
+            code: int | None = None
+            delivered = False
             try:
                 async with httpx.AsyncClient(timeout=10) as client:
-                    response = await client.post(subscription["url"], content=payload, headers={"Content-Type": "application/json", "X-Linda-Event": event, "X-Linda-Delivery": delivery_id, "X-Linda-Signature": f"sha256={signature}"})
-                    code = response.status_code; delivered = 200 <= code < 300
+                    response = await client.post(
+                        subscription["url"], content=payload,
+                        headers={"Content-Type": "application/json", "X-Linda-Event": event,
+                                 "X-Linda-Delivery": delivery_id, "X-Linda-Signature": f"sha256={signature}"},
+                    )
+                    code = response.status_code
+                    delivered = 200 <= code < 300
             except httpx.HTTPError:
                 pass
             with transaction() as conn:
-                conn.execute("INSERT INTO webhook_deliveries (id,subscription_id,case_id,event,attempt,status_code,delivered,attempted_at) VALUES (?,?,?,?,?,?,?,?)", (new_id("delivery"), subscription["id"], case_id, event, attempt, code, int(delivered), now()))
-                append_event(conn, case_id, "system", "WEBHOOK_DELIVERED" if delivered else "WEBHOOK_FAILED", {"subscription_id": subscription["id"], "event": event, "attempt": attempt, "status_code": code, "delivery_id": delivery_id})
-            if delivered: break
+                conn.execute(
+                    "INSERT INTO webhook_deliveries (id,subscription_id,case_id,event,attempt,status_code,delivered,attempted_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (delivery_id, subscription["id"], case_id, event, attempt, code, int(delivered), now()),
+                )
+                append_event(conn, case_id, "system", "WEBHOOK_DELIVERED" if delivered else "WEBHOOK_FAILED", {
+                    "subscription_id": subscription["id"], "event": event, "attempt": attempt,
+                    "status_code": code, "delivery_id": delivery_id,
+                })
+            if delivered:
+                break
 
 
 async def deliver_webhooks_for_case(case_id: str, event: str) -> None:

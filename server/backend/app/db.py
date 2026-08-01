@@ -1,19 +1,18 @@
-"""SQLite persistence for the Person 2 workflow.
+"""Persistence for the activation-readiness workflow (SQLite locally, Postgres on Vercel).
 
-The tables map directly to the action, approval, audit, export, and partner API
-surfaces. Events are intentionally only written through append_event().
+The tables map directly to the evidence, action, approval, audit, export, and
+partner API surfaces. Case events are only ever written through append_event(),
+which is what keeps the audit trail append-only and hash-chained.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import secrets
 import sqlite3
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any
 
 try:
@@ -23,7 +22,7 @@ except ImportError:  # pragma: no cover - only helps a bare source checkout
 
 from .config import settings
 from .domain import canonical_json, loads, new_id, now, sha256
-from .library import action_cards, policy
+from .library import validate_library
 
 try:  # PostgreSQL is only required for Vercel production deployments.
     import psycopg
@@ -50,6 +49,7 @@ CREATE TABLE IF NOT EXISTS source_snapshots (
   endpoint_url TEXT NOT NULL,
   retrieved_at TEXT NOT NULL,
   payload_json TEXT NOT NULL,
+  payload_raw TEXT,
   payload_sha256 TEXT NOT NULL,
   schema_ok INTEGER NOT NULL,
   freshness TEXT NOT NULL,
@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS source_snapshots (
   endpoint_url TEXT NOT NULL,
   retrieved_at TEXT NOT NULL,
   payload_json TEXT NOT NULL,
+  payload_raw TEXT,
   payload_sha256 TEXT NOT NULL,
   schema_ok SMALLINT NOT NULL,
   freshness TEXT NOT NULL,
@@ -406,13 +407,27 @@ def append_event(conn: sqlite3.Connection, case_id: str, actor_id: str, event_ty
     return event
 
 
+def _migrate(conn: Any) -> None:
+    """Additive column migrations for databases created by an earlier build."""
+    for statement in ("ALTER TABLE source_snapshots ADD COLUMN payload_raw TEXT",):
+        try:
+            conn.execute(statement)
+        except Exception:  # noqa: BLE001 - column already present on a current schema
+            conn.rollback() if settings.database_engine == "postgres" else None
+
+
 def init_db() -> None:
+    # A malformed policy or action card must stop the process here rather than
+    # produce assessments against a rulebook nobody reviewed (build.md 6.4).
+    validate_library()
     with transaction() as conn:
         conn.executescript(POSTGRES_SCHEMA if settings.database_engine == "postgres" else SCHEMA)
+        _migrate(conn)
         if conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"] == 0:
             seed_demo(conn)
-        if not conn.execute("SELECT 1 FROM app_settings WHERE key = 'source_mode'").fetchone():
-            conn.execute("INSERT INTO app_settings (key,value) VALUES ('source_mode','live_first')")
+        for key, value in (("source_mode", "live_first"), ("replay_step", "2")):
+            if not conn.execute("SELECT 1 FROM app_settings WHERE key = ?", (key,)).fetchone():
+                conn.execute("INSERT INTO app_settings (key,value) VALUES (?,?)", (key, value))
 
 
 def seed_demo(conn: sqlite3.Connection) -> None:
@@ -433,64 +448,11 @@ def seed_demo(conn: sqlite3.Connection) -> None:
                signing_key = EXCLUDED.signing_key, created_at = EXCLUDED.created_at""",
             (user_id, email, display_name, role, org, _password_hash("linda-demo"), secrets.token_hex(32), now()),
         )
-    existing = conn.execute("SELECT COUNT(*) AS count FROM decision_cases").fetchone()["count"]
-    if existing:
+    if conn.execute("SELECT COUNT(*) AS count FROM decision_cases").fetchone()["count"]:
         return
-    policy_id = policy()["id"]
-    cards = action_cards()
-    case_id = "case_bungoma_ond2026"
-    created_at = now()
-    fixture_root = Path(__file__).resolve().parents[1] / "fixtures" / "replay"
-    seeded_snapshots: dict[str, dict[str, Any]] = {}
-    for adapter, fixture_name in (("triggers", "triggers.json"), ("forecasts", "forecasts.json"), ("areas", "areas.json")):
-        payload = json.loads((fixture_root / fixture_name).read_text(encoding="utf-8"))
-        raw = canonical_json(payload)
-        snapshot_id = f"snap_seed_{adapter}"
-        seeded_snapshots[adapter] = {"id": snapshot_id, "payload": payload, "sha": sha256(raw)}
-        conn.execute(
-            """INSERT INTO source_snapshots (id,adapter,endpoint_url,retrieved_at,payload_json,payload_sha256,schema_ok,freshness,logical_key,meta_json)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (snapshot_id, adapter, f"fixtures/replay/{fixture_name}", created_at, raw, sha256(raw), 1, "replay", adapter, canonical_json({"mode": "replay_only", "synthetic": adapter != "areas"})),
-        )
-    assessment = {
-        "policy_version_id": policy_id, "stage": "set", "ndma_phase": "Alarm",
-        "gates": [{"id": "source_freshness", "passed": True, "detail": "Replay snapshot recorded 2026-07-22"},
-                  {"id": "schema_valid", "passed": True, "detail": "All 4 snapshots passed validation"},
-                  {"id": "lead_time", "passed": True, "detail": "Eligible cards have time before onset"}],
-        "stage_trace": [{"stage": "ready", "condition": "P ≥ 0.35", "observed": 0.52, "passed": True},
-                        {"stage": "set", "condition": "P ≥ 0.50", "observed": 0.52, "passed": True},
-                        {"stage": "go", "condition": "P ≥ 0.60", "observed": 0.52, "passed": False}],
-        "cost_loss": {"exposed_households": 12000, "loss_per_household_usd": 180, "expected_avoidable_loss_usd": 756000, "margin_usd": 5000},
-        "eligible_action_cards": ["card_destocking_v1", "card_water_trucking_v1", "card_fodder_v1"],
-        "ineligible": [{"card": "card_seed_distribution_v1", "reason": "lead-time gate failed (needs 75d; have 41d)"}],
-        "compound_signals": ["drought", "flood"],
-    }
-    evidence = [
-        {"id": seeded_snapshots["forecasts"]["id"], "kind": "forecast", "label": "OND 2026 return-period forecast", "adapter": "forecasts", "endpoint_url": "fixtures/replay/forecasts.json", "retrieved_at": created_at, "payload_sha256": seeded_snapshots["forecasts"]["sha"], "freshness": "replay", "schema_ok": True},
-        {"id": seeded_snapshots["triggers"]["id"], "kind": "trigger_rule", "label": "Bungoma Triggers", "adapter": "triggers", "endpoint_url": "fixtures/replay/triggers.json", "retrieved_at": created_at, "payload_sha256": seeded_snapshots["triggers"]["sha"], "freshness": "replay", "schema_ok": True},
-    ]
-    conn.execute(
-        """INSERT INTO decision_cases (id,area_id,area_name,hazard,title,state,policy_version_id,assessment_json,evidence_json,action_card_ids_json,stage,version,created_by,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (case_id, "KEN.3_1", "Bungoma", "drought", "OND 2026 drought — Bungoma", "ASSESSED", policy_id,
-         canonical_json(assessment), canonical_json(evidence), canonical_json([card["id"] for card in cards if card["hazard"] == "drought"]),
-         "set", 1, "usr_david", created_at, created_at),
-    )
-    tasks = [
-        ("task_transport", "card_destocking_v1", "Transport contracts confirmed", "ngo_finance_lead", "critical", "BLOCKED", "LOGISTICS_TRANSPORT", "Two suppliers have not confirmed access to the market route."),
-        ("task_market", "card_destocking_v1", "Market days scheduled with county", "county_drm_officer", "normal", "ACKNOWLEDGED", None, None),
-        ("task_water", "card_water_trucking_v1", "Water point access permissions confirmed", "county_drm_officer", "critical", "ACKNOWLEDGED", None, None),
-        ("task_fodder", "card_fodder_v1", "Fodder suppliers pre-qualified", "ngo_finance_lead", "normal", "PENDING", None, None),
-    ]
-    for task_id, card_id, title, role, criticality, state, code, note in tasks:
-        conn.execute(
-            """INSERT INTO readiness_tasks (id,case_id,action_card_id,title,owner_role,owner_user_id,criticality,state,blocker_code,blocker_note,updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (task_id, case_id, card_id, title, role, None, criticality, state, code, note, created_at),
-        )
-    append_event(conn, case_id, "usr_david", "CASE_CREATED", {"title": "OND 2026 drought — Bungoma", "mode": "exercise"})
-    append_event(conn, case_id, "system", "ASSESSED", {"stage": "set", "gates_passed": True, "compound_signals": ["drought", "flood"]})
-    append_event(conn, case_id, "usr_grace", "TASK_UPDATED", {"task_id": "task_transport", "state": "BLOCKED", "blocker_code": "LOGISTICS_TRANSPORT"})
+    from .demo_seed import seed_cases
+
+    seed_cases(conn)
 
 
 def reset_demo() -> None:

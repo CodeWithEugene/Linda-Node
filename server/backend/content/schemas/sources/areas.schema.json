@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ICPAC GADM admin-area payload",
+  "type": "object",
+  "required": ["areas"],
+  "properties": {
+    "areas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "country", "level"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "country": { "type": "string" },
+          "level": { "type": "integer" },
+          "geometry": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}

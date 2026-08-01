@@ -6,12 +6,14 @@ It is deliberately not an alert-delivery system, a fund-disbursement system, or 
 
 ## What it does
 
-- Captures source snapshots with retrieval time, SHA-256 hash, validation state, and a clear live, cached, stale, or replay label.
-- Creates a decision case for an administrative area and evaluates a versioned YAML policy in deterministic code.
+- Captures source snapshots by storing each upstream body **verbatim** and hashing it *before* parsing, so a reviewer can reproduce the recorded SHA-256 with `curl <url> | shasum -a 256`. Every snapshot carries its retrieval time, JSON Schema result, and a clear live, cached, stale, or replay label.
+- Masks every personal email address present in upstream trigger rules on every API response, UI render, packet, and export.
+- Creates a decision case for an administrative area and evaluates a versioned YAML policy in deterministic code. When no stage condition is met it reports **"no activation recommended"** rather than inferring a stage.
 - Materialises readiness tasks from approved action cards and prevents review when a critical task is unresolved.
 - Records three distinct role approvals using HMAC-SHA256 over a canonical case snapshot.
 - Produces immutable decision artifacts: a PDF/JSON packet, CAP 1.2 XML, Husika-shaped JSON validated against a vendored OpenAPI snapshot, and an offline ZIP bundle.
 - Exposes approved or revoked activations through a documented, read-only partner API and signed webhooks.
+- Surfaces ICPAC's own trigger action types (`email_alert`, `dashboard_update`) read live from `/api/triggers/actions/` — the gap Linda's governed activation fills.
 - Offers constrained Gemini assists for explaining evidence, ranking already-eligible action cards, and structuring blocker reports. Assists cannot change policy, tasks, approvals, or case state.
 
 ## Product flow
@@ -28,7 +30,11 @@ Readiness tasks and blockers ──► three-role approval
         └──────────────► immutable exports and partner-ready handoff
 ```
 
-The demo policy and action cards are illustrative. They are not official ICPAC, county-government, or financing-partner policy.
+The demo policy and action cards are illustrative. They are not official ICPAC, county-government, or financing-partner policy. Both are JSON Schema-validated at startup: an invalid rulebook stops the process rather than producing assessments nobody reviewed.
+
+### Live data versus the demo scenario
+
+The recorded OND 2026 return-period statistics for Bungoma sit far below every policy threshold, so a live assessment there correctly reports **no activation recommended**. The scripted walkthrough therefore uses a labelled synthetic escalation (steps 1–3 stepping Bungoma to P 0.32 / 0.52 / 0.63); every other admin row stays the verbatim recorded ICPAC statistic. Any assessment driven by a synthetic reading is flagged as such in the UI, the assessment JSON, the packet, and the partner API — a synthetic value is never labelled `official_source`.
 
 ## Quick start
 
@@ -79,7 +85,7 @@ The container serves the web client and API at `http://localhost:8000`. The `lin
 
 ## Demo walkthrough
 
-All seeded personas use the password `linda-demo`.
+All seeded personas use the password `linda-demo`. Seeding creates three cases so a first-time visitor sees the whole arc immediately: the blocked case below, a completed `HANDED_OFF` case with all four exports already generated, and a `REVOKED` case showing the stop-trigger path. The public CAP feed is populated from the moment the app boots.
 
 | Persona | Role | Use in the walkthrough |
 |---|---|---|
@@ -95,6 +101,7 @@ All seeded personas use the password `linda-demo`.
 4. Sign in as David and send the case for review.
 5. Sign in as Amina, David, and Grace in turn to record the three approvals.
 6. Return as David to generate exports, mark the case handed off, or demonstrate revocation.
+7. As `admin@demo`, use **Stop-trigger evaluation** to inject an observation. The *policy* decides: a value above `stop_trigger.probability_lt` is recorded and the case stands; a value below it revokes the case and makes a CAP `Cancel` available. The same screen advances the labelled synthetic escalation and switches between `live_first` and `replay_only`.
 
 For a new case, begin in **Signal Inbox**. Open a source record, create a case, and review the deterministic assessment in the **Evidence** tab. Demo fixtures keep this flow available when an upstream public endpoint is unavailable.
 
@@ -104,7 +111,7 @@ For a new case, begin in **Signal Inbox**. Open a source record, create a case, 
 |---|---|
 | `client/frontend` | React, TypeScript, and Material UI single-page application. |
 | `server/backend` | FastAPI service, SQLite for local development or Neon Postgres on Vercel, policy evaluation, exports, and partner API. |
-| Source adapter | Retrieves or replays source data, preserves raw snapshots, and exposes freshness/provenance. |
+| Source adapter | Retrieves or replays source data, stores each upstream body verbatim, hashes it before parsing, validates the normalised view against a JSON Schema, and masks personal addresses on read. |
 | Policy and action library | Versioned YAML inputs used by deterministic assessment logic. |
 | Audit chain | Append-only case events linked by SHA-256 hashes. |
 | Partner surface | CAP feed, versioned read API, verification report, API keys, and signed outbound webhooks. |
@@ -161,6 +168,8 @@ The included `Dockerfile.vercel` remains available for container-based deploymen
 
 ## Safety and limitations
 
+- Assessments are never fabricated: with no qualifying signal the system says "no activation recommended" and blocks the workflow at the `signal_present` gate.
+- Synthetic demo values are labelled everywhere they appear and are ranked *below* recorded upstream evidence when both are attached.
 - The demo uses fictional accounts and server-held HMAC keys. Its approval records are integrity protection inside this demo, not PKI, blockchain, or an external digital-signature service.
 - Husika payloads validate against a vendored published contract. Linda does not call Husika write endpoints.
 - CAP documents have status `Exercise` only.
@@ -171,14 +180,33 @@ The included `Dockerfile.vercel` remains available for container-based deploymen
 ```bash
 cd server/backend
 .venv/bin/ruff check app tests
+.venv/bin/python -c "from app.library import validate_library; print(validate_library())"
 .venv/bin/pytest -q
 
 cd ../../client/frontend
+npx tsc -b --noEmit
+npm test
 npm run build
-npm test -- --passWithNoTests
 ```
 
-The backend workflow suite covers guarded transitions, blocker handling, three-role signatures, immutable exports, CAP and Husika validation, partner verification, audit-chain tampering, source-backed assessment, and approval supersession on reassessment.
+The backend suite (137 tests) covers:
+
+- **Policy engine** — every stage boundary at, just below, and just above each threshold; every gate; the stop trigger; cost-loss arithmetic against hand-computed figures; the no-fabrication rule; area isolation; purity.
+- **State machine** — every legal transition plus every illegal one attempted through the API and asserted rejected, including observer and non-owner role bypass, direct `APPROVED` transitions, two-signature approval, blocked critical tasks, and terminal states.
+- **Signing** — canonical-JSON stability, digest determinism, signature verification, supersession on re-assessment.
+- **Adapters** — live ICPAC field mapping, schema accept/reject, email masking across every endpoint and export, verbatim-body hashing, TTL cache, escalation steps, and stale fallback.
+- **Exports** — manifest hash stability, CAP validated against the OASIS XSD (Alert and Cancel), Husika payloads validated against the vendored spec with negative enum tests, bundle checksums, and a zero-external-request check on the offline dossier.
+- **Partner API** — key auth, revocation, rate limiting, cursor pagination, a frozen response shape checked against the published JSON Schema, tamper detection, and webhook signature/retry behaviour.
+- **Security** — HTML escaping of untrusted text, login rate limiting, forged-cookie rejection, no secrets in any export, and fail-closed policy loading.
+
+A separate opt-in job hits the real ICPAC and Husika endpoints and fails loudly if the upstream shapes drift:
+
+```bash
+cd server/backend
+.venv/bin/pytest -q -m contract --contract
+```
+
+It also runs on a daily schedule and via `workflow_dispatch` in CI.
 
 ## Documentation
 

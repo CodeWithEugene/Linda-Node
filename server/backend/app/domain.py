@@ -34,7 +34,11 @@ def now() -> str:
 
 
 def new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid.uuid4().hex}"
+    """ULID-style: a millisecond timestamp prefix keeps ids lexicographically
+    sortable, so rows written inside the same whole second still have a
+    deterministic order (timestamps are stored at second resolution)."""
+    milliseconds = int(datetime.now(UTC).timestamp() * 1000)
+    return f"{prefix}_{milliseconds:012x}{uuid.uuid4().hex[:14]}"
 
 
 def canonical_json(value: Any) -> str:

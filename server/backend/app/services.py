@@ -19,8 +19,8 @@ from .domain import (
     now,
     sha256,
 )
-from .library import action_cards
-from .policy_engine import evaluate
+from .library import action_cards, policy
+from .policy_engine import evaluate, evaluate_stop_trigger
 
 
 def _not_found() -> HTTPException:
@@ -52,11 +52,17 @@ def case_summary(case: dict[str, Any]) -> dict[str, Any]:
     return {key: case[key] for key in ("id", "area_id", "area_name", "hazard", "title", "state", "stage", "version", "created_at", "updated_at")}
 
 
-def canonical_case_json(case: dict[str, Any], signed_state: str | None = None) -> str:
-    """The exact payload that three role signatures attest to."""
+def canonical_case_json(case: dict[str, Any]) -> str:
+    """The exact payload that three role signatures attest to.
+
+    Deliberately excludes `state`: a signature attests to the *decision facts*
+    (area, hazard, policy version, assessment, evidence hashes, task states),
+    and the third signature itself advances the case to APPROVED. Including the
+    state would invalidate every signature the instant it landed.
+    """
     payload = {
         "case_id": case["id"], "area_id": case["area_id"], "area_name": case["area_name"],
-        "hazard": case["hazard"], "state": signed_state or case["state"],
+        "hazard": case["hazard"],
         "policy_version_id": case["policy_version_id"], "assessment": case["assessment"],
         "evidence_hashes": sorted(item.get("payload_sha256", "") for item in case["evidence"]),
         "tasks": sorted(
@@ -227,23 +233,45 @@ def transition_case(
     return get_case(conn, case_id)
 
 
-def revoke_for_stop_trigger(
+def evaluate_stop_trigger_for_case(
     conn: sqlite3.Connection, case_id: str, observed_probability: float
 ) -> dict[str, Any]:
-    """System-only revocation used by the explicit, labelled demo stop trigger."""
+    """Evaluate the policy stop condition against an injected observation.
+
+    The demo route supplies the observation the way a new upstream snapshot
+    would; the *decision* to revoke is made here by `policy.stop_trigger`, not
+    by the caller. An observation above the threshold leaves the case alone and
+    is still recorded, so the control is demonstrably a condition and not a
+    button.
+    """
     case = get_case(conn, case_id)
     if case["state"] not in {"APPROVED", "HANDED_OFF"}:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Stop-trigger revocation requires an approved or handed-off case",
+            detail="Stop-trigger evaluation requires an approved or handed-off case",
         )
+    document = policy()["data"]["policy"]
+    verdict = evaluate_stop_trigger(document, observed_probability)
+    append_event(conn, case_id, "system", "STOP_TRIGGER_EVALUATED", {
+        "condition": verdict["condition"],
+        "indicator": verdict["indicator"],
+        "observed_probability": observed_probability,
+        "fired": verdict["fired"],
+        "policy_version_id": policy()["id"],
+    })
+    if not verdict["fired"]:
+        _bump_case(conn, case)
+        return {**get_case(conn, case_id), "stop_trigger": verdict}
     _bump_case(conn, case, state="REVOKED")
+    append_event(conn, case_id, "system", "STOP_TRIGGER_FIRED", {
+        "condition": verdict["condition"], "observed_probability": observed_probability,
+    })
     append_event(conn, case_id, "system", "STATE_CHANGED", {
         "from": case["state"], "to": "REVOKED",
-        "reason": f"Exercise stop trigger: probability fell to {observed_probability:.2f}",
+        "reason": f"Exercise stop trigger {verdict['condition']}: observed probability {observed_probability:.2f}",
         "observed_probability": observed_probability,
     })
-    return get_case(conn, case_id)
+    return {**get_case(conn, case_id), "stop_trigger": verdict}
 
 
 def record_approval(
@@ -287,13 +315,7 @@ def record_approval(
 
 def verify_approvals(conn: sqlite3.Connection, case_id: str) -> dict[str, Any]:
     case = get_case(conn, case_id)
-    # The third signature atomically advances the case to APPROVED. The signed
-    # decision snapshot remains READY_FOR_REVIEW through a later handoff, so
-    # verification compares the decision facts rather than that bookkeeping
-    # transition. Evidence reassessment supersedes signatures before it can
-    # mutate assessment/evidence/task data.
-    signing_state = "READY_FOR_REVIEW" if case["state"] in {"APPROVED", "HANDED_OFF"} else case["state"]
-    current_digest = sha256(canonical_case_json(case, signing_state))
+    current_digest = sha256(canonical_case_json(case))
     results = []
     for approval in case["approvals"]:
         user = conn.execute("SELECT signing_key FROM users WHERE id = ?", (approval["user_id"],)).fetchone()
@@ -366,9 +388,10 @@ def attach_evidence_and_assess(
             "label": f"{snapshot['adapter'].replace('_', ' ').title()} snapshot",
             "adapter": snapshot["adapter"], "endpoint_url": snapshot["endpoint_url"], "retrieved_at": snapshot["retrieved_at"],
             "payload_sha256": snapshot["payload_sha256"], "freshness": snapshot["freshness"], "schema_ok": bool(snapshot["schema_ok"]),
+            "schema_errors": (snapshot.get("meta") or {}).get("schema_errors", []),
         }
     evidence = list(merged.values())
-    assessment = evaluate(snapshots, case["hazard"])
+    assessment = evaluate(snapshots, case["hazard"], case["area_id"])
     if case["state"] in {"READY_FOR_REVIEW", "NEEDS_EVIDENCE"}:
         supersede_approvals_for_reassessment(conn, case_id, actor["id"])
     next_state = "ASSESSED"

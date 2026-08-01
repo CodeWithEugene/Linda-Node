@@ -2,20 +2,94 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://linda-protocol.example/integration/v1/schemas/activation.json",
   "title": "Linda Protocol Integration Activation v1",
+  "description": "Frozen v1 contract. Adding or removing a property here is a breaking change and requires /integration/v2/.",
   "type": "object",
-  "required": ["mode", "disclaimer", "id", "area", "hazard", "stage", "state", "assessment", "approvals", "evidence", "links"],
+  "additionalProperties": false,
+  "required": [
+    "mode", "disclaimer", "id", "title", "area", "hazard", "stage", "ndma_phase", "state",
+    "assessment", "action_cards", "approvals", "evidence", "compound_signals",
+    "manifest_sha256", "links"
+  ],
   "properties": {
-    "mode": {"const": "exercise"},
-    "disclaimer": {"type": "string"},
-    "id": {"type": "string"},
-    "title": {"type": "string"},
-    "area": {"type": "object", "required": ["id", "name"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
-    "hazard": {"type": "string"},
-    "stage": {"type": ["string", "null"]},
-    "state": {"enum": ["APPROVED", "HANDED_OFF", "REVOKED"]},
-    "assessment": {"type": "object"},
-    "approvals": {"type": "array"},
-    "evidence": {"type": "array"},
-    "links": {"type": "object"}
+    "mode": { "const": "exercise" },
+    "disclaimer": { "type": "string", "minLength": 10 },
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "area": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": { "id": { "type": "string" }, "name": { "type": "string" } }
+    },
+    "hazard": { "type": "string", "enum": ["drought", "flood", "heat"] },
+    "stage": { "enum": ["ready", "set", "go", null] },
+    "ndma_phase": { "type": ["string", "null"] },
+    "state": { "enum": ["APPROVED", "HANDED_OFF", "REVOKED"] },
+    "assessment": {
+      "type": "object",
+      "required": ["policy_version_id", "stage", "gates", "stage_trace", "cost_loss", "stop_trigger", "recommendation"],
+      "properties": {
+        "policy_version_id": { "type": "string" },
+        "recommendation": { "type": "string" },
+        "gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "passed", "detail"],
+            "properties": { "id": { "type": "string" }, "passed": { "type": "boolean" }, "detail": { "type": "string" } }
+          }
+        },
+        "stage_trace": { "type": "array" },
+        "cost_loss": { "type": "object", "required": ["expected_avoidable_loss_usd", "sources"] },
+        "stop_trigger": { "type": "object", "required": ["armed", "condition", "fired"] }
+      }
+    },
+    "action_cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "budget"],
+        "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "budget": { "type": "object" } }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "signer", "decision", "signed_at", "digest", "signature", "signature_valid"],
+        "properties": {
+          "role": { "type": "string" },
+          "signer": { "type": "string" },
+          "decision": { "type": "string" },
+          "signature_valid": { "type": "boolean" },
+          "covers_current_case": { "type": "boolean" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "label", "endpoint_url", "retrieved_at", "payload_sha256", "freshness"],
+        "properties": {
+          "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "freshness": { "enum": ["live", "cached", "stale", "replay"] }
+        }
+      }
+    },
+    "compound_signals": { "type": "array", "items": { "type": "string" } },
+    "manifest_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "links": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["self", "cap", "husika_payload", "verify"],
+      "properties": {
+        "self": { "type": "string" },
+        "cap": { "type": "string" },
+        "husika_payload": { "type": "string" },
+        "verify": { "type": "string" }
+      }
+    }
   }
 }
