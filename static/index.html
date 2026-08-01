@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Linda Protocol</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>Linda Protocol</strong>
+        <span>Activation-readiness control plane</span>
+      </div>
+      <div class="toolbar">
+        <select id="user" aria-label="Demo user"></select>
+        <button id="seed">Reset Demo</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Exercise mode | replay evidence</p>
+          <h1>OND 2026 drought - Bungoma</h1>
+          <p>Governed activation between ICPAC signals and partner handoff. No alerts or funds are sent.</p>
+        </div>
+        <div class="status">
+          <span id="case-state">Loading</span>
+          <code id="digest"></code>
+        </div>
+      </section>
+
+      <section class="summary" aria-label="Workflow summary">
+        <div><strong id="summary-signals">0</strong><span>evidence snapshots</span></div>
+        <div><strong id="summary-blockers">0</strong><span>critical blockers</span></div>
+        <div><strong id="summary-approvals">0/3</strong><span>role signatures</span></div>
+        <div><strong id="summary-exports">0/5</strong><span>exports generated</span></div>
+      </section>
+
+      <nav>
+        <button data-tab="signals" class="active">Signal Inbox</button>
+        <button data-tab="case">Decision Case</button>
+        <button data-tab="approvals">Approvals</button>
+        <button data-tab="exports">Handoffs</button>
+        <button data-tab="library">Policy Library</button>
+        <button data-tab="audit">Audit Log</button>
+      </nav>
+
+      <section id="signals" class="tab active">
+        <div class="section-head">
+          <div>
+            <h2>Signal Inbox</h2>
+            <p class="muted">Replay snapshots preserve the same provenance fields used by the full live adapter.</p>
+          </div>
+          <div class="legend">
+            <span><i class="dot official"></i> official source</span>
+            <span><i class="dot policy"></i> policy assumption</span>
+            <span><i class="dot userdot"></i> user action</span>
+            <span><i class="dashbox"></i> constrained AI assist</span>
+          </div>
+        </div>
+        <div id="signal-list" class="grid"></div>
+      </section>
+
+      <section id="case" class="tab">
+        <h2>Evidence and Readiness</h2>
+        <div class="two">
+          <article>
+            <h3>Policy Trace</h3>
+            <div id="gates"></div>
+          </article>
+          <article>
+            <h3>Action Cards</h3>
+            <div id="cards"></div>
+          </article>
+        </div>
+        <article>
+          <h3>Readiness Board</h3>
+          <div id="tasks"></div>
+          <div class="actions">
+            <button id="send-review">Send for review</button>
+            <span id="review-message"></span>
+          </div>
+        </article>
+      </section>
+
+      <section id="approvals" class="tab">
+        <div class="section-head">
+          <div>
+            <h2>Three-role Approval</h2>
+            <p class="muted">Each role signs the canonical case digest with a demo HMAC key.</p>
+          </div>
+          <button id="verify-signatures">Verify signatures</button>
+        </div>
+        <div id="signature-verification"></div>
+        <div id="approval-list" class="grid"></div>
+      </section>
+
+      <section id="exports" class="tab">
+        <h2>Handoffs and Exports</h2>
+        <p class="muted">Exports are generated artifacts only. Linda validates and records; it does not dispatch.</p>
+        <div id="export-list" class="grid"></div>
+        <article>
+          <h3>Consumable Integration API</h3>
+          <p class="muted">Read-only endpoints for partner systems to retrieve the record, artifacts, and verification status.</p>
+        <div id="integration"></div>
+        </article>
+      </section>
+
+      <section id="library" class="tab">
+        <div class="section-head">
+          <div>
+            <h2>Policy and Action Library</h2>
+            <p class="muted">Versioned policy source and action-card definitions used to make the decision trace inspectable.</p>
+          </div>
+          <span id="library-hash" class="hash"></span>
+        </div>
+        <article>
+          <h3>Activation policy</h3>
+          <pre id="policy-text"></pre>
+        </article>
+        <div id="actions-library" class="grid"></div>
+      </section>
+
+      <section id="audit" class="tab">
+        <h2>Audit Log</h2>
+        <div id="chain"></div>
+        <div id="audit-list"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
