@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from alembic import command
+from alembic.config import Config
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -14,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .auth import current_user, issue_token, key_hash, new_integration_key, password_matches, require_roles
 from .config import settings
-from .db import Base, engine, get_db
+from .db import Base, get_db
 from .domain import (REQUIRED_ROLES, append_event, canonical, case_digest, json_load, public_case,
                      signature, transition, utcnow, verify_chain, verify_signatures)
 from .exports import generate
@@ -23,10 +25,18 @@ from .schemas import (IntegrationKeyRequest, LoginRequest, RevokeRequest, TokenR
 from .seed import seed
 from .webhooks import deliver
 
+
+def upgrade_database() -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    alembic_cfg = Config(str(backend_root / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(backend_root / "alembic"))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    command.upgrade(alembic_cfg, "head")
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.export_dir.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=engine)
+    upgrade_database()
     db = next(get_db())
     try:
         seed(db)
