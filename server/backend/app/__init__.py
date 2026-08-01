@@ -1,1 +1,1 @@
-"""Linda Protocol API package."""
+"""Linda Node API package."""

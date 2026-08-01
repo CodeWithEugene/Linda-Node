@@ -491,7 +491,7 @@ function ActionCardTile({ card, ineligibleReason }: { card: ActionCard; ineligib
         <Divider sx={{ my: 1.5 }} />
         <Typography variant="body2"><strong>Readiness tranche:</strong> {money(card.budget.readiness_tranche.amount, card.budget.currency)} · at {card.budget.readiness_tranche.released_at_stage.toUpperCase()}</Typography>
         <Typography variant="body2"><strong>Action tranche:</strong> {money(card.budget.action_tranche.amount, card.budget.currency)} · at {card.budget.action_tranche.released_at_stage.toUpperCase()}</Typography>
-        <Typography variant="caption" color="text.secondary">Recorded recommendation only — Linda Protocol moves no funds.</Typography>
+        <Typography variant="caption" color="text.secondary">Recorded recommendation only — Linda Node moves no funds.</Typography>
         {ineligibleReason && <Alert severity="error" sx={{ mt: 1 }}>Ineligible: {ineligibleReason}</Alert>}
       </CardContent>
     </Card>
@@ -965,7 +965,7 @@ function ExportsTab({ caseItem }: { caseItem: DecisionCase }) {
                   ? `Validates against ${contract.data.title} v${contract.data.version} · spec ${contract.data.sha256.slice(0, 12)}… ✓`
                   : 'Loading the Husika OpenAPI contract…'}
                 <br />
-                Ready for dispatch by an authorised Husika operator — Linda Protocol does not send.
+                Ready for dispatch by an authorised Husika operator — Linda Node does not send.
               </Alert>
             </Stack>
           ), user?.role === 'county_drm_officer' || user?.role === 'ngo_finance_lead')}

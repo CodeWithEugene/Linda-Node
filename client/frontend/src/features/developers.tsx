@@ -15,6 +15,7 @@ import Tabs from '@mui/material/Tabs'
 import Typography from '@mui/material/Typography'
 import Api from '@mui/icons-material/Api'
 import { CopyButton } from '../components'
+import { Logo } from '../Logo'
 
 const ENDPOINTS: [string, string, string, string][] = [
   ['GET', '/cap/feed.xml', 'Public', 'CAP 1.2 Atom feed of approved and revoked exercise activations.'],
@@ -48,8 +49,9 @@ export function DeveloperDocsPage({ embedded = false }: { embedded?: boolean }) 
           </Typography>
         </Box>
 
-        <Alert severity="warning">
-          Exercise environment. Every response is labelled as an exercise, and this API never sends public alerts or moves funds.
+        <Alert severity="info">
+          Activation records are published for integration only. CAP documents carry <Box component="code" className="mono">status=Exercise</Box>{' '}
+          so a downstream aggregator can never mistake this feed for an accredited operational one, and Linda dispatches nothing itself.
         </Alert>
 
         <Grid container spacing={2}>
@@ -172,9 +174,9 @@ export function DeveloperDocsPage({ embedded = false }: { embedded?: boolean }) 
     <Box minHeight="100dvh" sx={{ bgcolor: 'background.default' }}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper', px: { xs: 2, md: 5 }, py: 1.5 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Api color="primary" />
-            <Typography fontWeight={800}>Linda Protocol Developers</Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Logo height={28} />
+            <Typography variant="body2" color="text.secondary">Developers</Typography>
           </Stack>
           <Button component={Link} to="/login">Sign in to the workspace</Button>
         </Stack>

@@ -465,7 +465,10 @@ def _fixture_text(name: str) -> tuple[str, str]:
 
 
 def _replay(conn: sqlite3.Connection, adapter: str, mode: str, reason: str | None = None) -> dict[str, Any]:
-    meta: dict[str, Any] = {"mode": mode, "fixture": True, "synthetic": adapter != "areas"}
+    # Every replay fixture is a verbatim recording of a real ICPAC response.
+    # Only the escalation steps below are team-authored, so only those are
+    # marked synthetic.
+    meta: dict[str, Any] = {"mode": mode, "fixture": True, "synthetic": False}
     if reason:
         meta["fallback_reason"] = reason
     if adapter == "pipeline":
@@ -480,7 +483,7 @@ def _replay(conn: sqlite3.Connection, adapter: str, mode: str, reason: str | Non
     if adapter == "indicators":
         text, location = _fixture_text("indicators.json")
         return _store(conn, adapter, location, normalise_indicators(json.loads(text)), "replay",
-                      raw_parts={location: text}, meta={**meta, "synthetic": False})
+                      raw_parts={location: text}, meta=meta)
     if adapter == "forecasts":
         step = replay_step(conn)
         name = f"escalation/step{step}.json" if step else "forecasts.json"
@@ -488,7 +491,8 @@ def _replay(conn: sqlite3.Connection, adapter: str, mode: str, reason: str | Non
         raw = json.loads(text)
         payload = normalise_forecasts(raw.get("available"), raw.get("stats"))
         return _store(conn, adapter, location, payload, "replay", raw_parts={location: text},
-                      meta={**meta, "escalation_step": step, "provenance": raw.get("_provenance", {})})
+                      meta={**meta, "synthetic": step > 0, "escalation_step": step,
+                            "provenance": raw.get("_provenance", {})})
     text, location = _fixture_text("areas.json")
     return _store(conn, adapter, location, normalise_areas(json.loads(text)), "replay", raw_parts={location: text}, meta=meta)
 

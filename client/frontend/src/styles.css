@@ -2,7 +2,7 @@ html, body, #root { min-height: 100%; margin: 0; }
 body { min-width: 320px; }
 #app-loader { align-items: center; background: #f7faf7; color: #173d24; display: flex; inset: 0; justify-content: center; position: fixed; z-index: 9999; }
 .loader-card { background: #fff; border: 1px solid #d6e2d7; border-radius: 12px; box-shadow: 0 8px 24px rgba(18, 53, 30, .12); display: grid; gap: 8px; max-width: 360px; padding: 28px; text-align: center; }
-.loader-card strong { font-size: 1.25rem; }
+.loader-card img { display: block; margin: 0 auto; max-width: 100%; height: auto; }
 .loader-card span { color: #4d6354; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .mono { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }

@@ -10,9 +10,9 @@ import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import Api from '@mui/icons-material/Api'
-import GppGood from '@mui/icons-material/GppGood'
 import Hub from '@mui/icons-material/Hub'
 import VerifiedUser from '@mui/icons-material/VerifiedUser'
+import { Logo } from '../Logo'
 import { useSession } from '../session'
 
 const capability = (icon: ReactNode, title: string, detail: string) => (
@@ -53,10 +53,7 @@ export function LoginPage() {
         <Box sx={{ position: 'absolute', width: 420, height: 420, borderRadius: '50%', bgcolor: 'rgba(255,255,255,.06)', top: -160, right: -155 }} />
         <Stack spacing={4} sx={{ position: 'relative', maxWidth: 600 }}>
           <Box>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
-              <GppGood />
-              <Typography fontWeight={700} letterSpacing={0.4}>LINDA PROTOCOL</Typography>
-            </Stack>
+            <Logo plate height={44} sx={{ mb: 3 }} />
             <Typography component="h1" variant="h2" sx={{ lineHeight: 1.1, mb: 2 }}>A defensible path from early warning to action.</Typography>
             <Typography variant="body1" sx={{ color: 'rgba(255,255,255,.78)', maxWidth: 540 }}>
               Linda turns evidence into reviewable activation decisions, preserving the policy trace, the role approvals, and every handoff.
@@ -85,7 +82,7 @@ export function LoginPage() {
 
       <Box sx={{ display: 'grid', placeItems: 'center', px: { xs: 2, sm: 5 }, py: { xs: 4, md: 7 }, bgcolor: 'background.paper' }}>
         <Card elevation={0} sx={{ width: '100%', maxWidth: 440, border: 1, borderColor: 'divider', boxShadow: '0 20px 48px rgba(20, 50, 30, .10)' }}>
-          <CardHeader title="Sign in to the workspace" subheader="Auditable activation readiness · Exercise environment" />
+          <CardHeader title="Sign in to the workspace" subheader="Auditable activation readiness across the Greater Horn of Africa" />
           <CardContent>
             <Alert severity="info" sx={{ mb: 2 }}>
               Use a fictional demo persona. The password for every account is <strong>linda-demo</strong>.

@@ -437,7 +437,7 @@ def seed_demo(conn: sqlite3.Connection) -> None:
         ("usr_david", "david.drm@demo", "David Wekesa", "county_drm_officer", "Bungoma County DRM"),
         ("usr_grace", "grace.ngo@demo", "Grace Njeri", "ngo_finance_lead", "Kenya Red Cross"),
         ("usr_observer", "observer@demo", "Observer", "observer", "Demo observer"),
-        ("usr_admin", "admin@demo", "Demo Administrator", "admin", "Linda Protocol"),
+        ("usr_admin", "admin@demo", "Demo Administrator", "admin", "Linda Node"),
     ]
     for user_id, email, display_name, role, org in users:
         conn.execute(

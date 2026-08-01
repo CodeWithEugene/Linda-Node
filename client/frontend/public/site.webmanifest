@@ -1,0 +1,15 @@
+{
+  "name": "Linda Node — activation readiness",
+  "short_name": "Linda Node",
+  "description": "Live readiness across every Greater Horn of Africa admin-1 unit, with a governed path from evidence to an approved activation record.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#E8552A",
+  "icons": [
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -4,6 +4,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate 
 import Alert from '@mui/material/Alert'
 import AppBar from '@mui/material/AppBar'
 import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -33,7 +34,6 @@ import Brightness4 from '@mui/icons-material/Brightness4'
 import Brightness7 from '@mui/icons-material/Brightness7'
 import DarkMode from '@mui/icons-material/DarkMode'
 import FactCheck from '@mui/icons-material/FactCheck'
-import Gavel from '@mui/icons-material/Gavel'
 import HelpOutline from '@mui/icons-material/HelpOutline'
 import Inbox from '@mui/icons-material/Inbox'
 import LightMode from '@mui/icons-material/LightMode'
@@ -44,6 +44,7 @@ import Public from '@mui/icons-material/Public'
 import Source from '@mui/icons-material/Source'
 import { api } from './api'
 import { ProvenanceLegend } from './components'
+import { Logo, LogoMark } from './Logo'
 import { SessionProvider, useSession } from './session'
 import { themeFor, ThemePreference } from './theme'
 import type { SourceStatus } from './types'
@@ -144,6 +145,7 @@ const NAVIGATION = [
  * live, so the banner reports exactly what produced the current snapshots.
  */
 function ModeBanner() {
+  const { user } = useSession()
   const status = useQuery({ queryKey: ['sources-status'], queryFn: () => api<SourceStatus>('/api/sources/status'), staleTime: 30_000 })
   if (!status.data) return null
   const sources = status.data.sources
@@ -167,12 +169,25 @@ function ModeBanner() {
       </Alert>
     )
   }
-  const synthetic = replay.filter((item) => item.meta?.synthetic || item.meta?.provenance?.synthetic)
+  // Replay fixtures are verbatim ICPAC recordings, so only a team-authored
+  // escalation step warrants a warning — and only the admin can clear it.
+  const synthetic = sources.filter((item) => item.meta?.synthetic || item.meta?.provenance?.synthetic)
   if (synthetic.length) {
     return (
-      <Alert severity="warning" sx={{ mb: 2 }}>
-        Synthetic escalation step {status.data.escalation_step} is active for {synthetic.map((item) => item.adapter).join(', ')}. Switch
-        the source mode back to live in Admin to return to recorded ICPAC statistics.
+      <Alert
+        severity="warning"
+        sx={{ mb: 2 }}
+        action={
+          user?.role === 'admin' ? (
+            <Button color="inherit" size="small" component={Link} to="/admin">Open Admin</Button>
+          ) : undefined
+        }
+      >
+        A team-authored escalation (step {status.data.escalation_step}) is driving {synthetic.map((item) => item.adapter).join(', ')} instead
+        of the recorded ICPAC statistics.{' '}
+        {user?.role === 'admin'
+          ? 'Set the escalation step back to 0 under Admin → Evidence source mode.'
+          : 'An administrator can reset it to step 0 under Admin → Evidence source mode.'}
       </Alert>
     )
   }
@@ -191,7 +206,10 @@ function Shell({ children, preference, setPreference }: { children: ReactNode; p
 
   const drawer = (
     <Box role="navigation" sx={{ width: 240, pt: 1 }}>
-      <Typography px={2} pb={1} variant="overline" color="text.secondary">Navigation</Typography>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ px: 2, pb: 1.5, pt: 0.5 }}>
+        <LogoMark size={26} />
+        <Typography variant="overline" color="text.secondary">Navigation</Typography>
+      </Stack>
       <List>
         {NAVIGATION.map(([path, label, icon]) => (
           <ListItemButton key={path} component={Link} to={path} selected={location.pathname === path} onClick={() => setOpen(false)}>
@@ -217,8 +235,10 @@ function Shell({ children, preference, setPreference }: { children: ReactNode; p
       <AppBar position="fixed" color="primary">
         <Toolbar>
           <IconButton color="inherit" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }} aria-label="Open navigation"><MenuIcon /></IconButton>
-          <Gavel sx={{ mr: 1 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>Linda Protocol</Typography>
+          <Box component={Link} to="/" aria-label="Linda Node home" sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+            <Logo plate height={26} />
+          </Box>
+          <Box sx={{ flexGrow: 1 }} />
           <Tooltip title="Provenance legend">
             <IconButton color="inherit" onClick={() => setHelpOpen(true)} aria-label="Open provenance legend"><HelpOutline /></IconButton>
           </Tooltip>

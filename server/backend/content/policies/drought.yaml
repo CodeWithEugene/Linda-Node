@@ -1,6 +1,6 @@
 policy:
   name: linda-demo-drought-policy
-  authors: [Linda Protocol demo team]
+  authors: [Linda Node demo team]
   disclaimer: Team-authored demonstration policy. It is illustrative, not official ICPAC, NDMA, or government policy.
   hazard: drought
   ndma_phase_mapping:

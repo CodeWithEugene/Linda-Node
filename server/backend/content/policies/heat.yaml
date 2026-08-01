@@ -1,6 +1,6 @@
 policy:
   name: linda-heat-readiness-policy
-  authors: [Linda Protocol team]
+  authors: [Linda Node team]
   disclaimer: >
     Team-authored readiness policy. Linda does not classify heat severity: the stage below is mapped
     from the severity level that ICPAC's own trigger rule assigns to a detected event. Costs and

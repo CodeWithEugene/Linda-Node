@@ -81,7 +81,9 @@ def _seed_snapshots(conn: Any, created_at: str) -> dict[str, dict[str, Any]]:
         "pipeline": _insert_snapshot(
             conn, "snap_0000seed_pipeline", "pipeline", "fixtures/replay/pipeline_ond2026.csv",
             parse_pipeline_csv(pipeline_text, source_file="03_prob_csv_q.py compatible output"),
-            pipeline_text, {"mode": "replay_only", "synthetic": False, "format": "exceedance_probability_csv"}, created_at),
+            pipeline_text, {"mode": "replay_only", "synthetic": False, "fixture": True,
+                            "format": "exceedance_probability_csv",
+                            "note": "Recorded ICPAC rp3 statistics rendered in the 03_prob_csv_q.py column layout."}, created_at),
     }
 
 

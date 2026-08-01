@@ -65,11 +65,11 @@ def packet_manifest(conn: Any, case_id: str) -> dict[str, Any]:
         release_lines.append({
             "card_id": card["id"],
             "recommended_release": f"readiness_tranche {card['budget']['currency']} {readiness['amount']} upon recorded human approvals",
-            "disclaimer": "Recommendation only; Linda Protocol moves no funds.",
+            "disclaimer": "Recommendation only; Linda Node moves no funds.",
         })
     body = {
         "mode": "exercise",
-        "disclaimer": "Linda Protocol hackathon demonstration. This record moves no funds. HMAC protects integrity within this demo system; it is not PKI, blockchain, or an external digital-signature service.",
+        "disclaimer": "Linda Node activation record. It moves no funds and dispatches no alert. HMAC-SHA256 protects integrity within this system using server-held keys; it is not PKI, a blockchain, or an external digital-signature service.",
         "case": {key: case[key] for key in ("id", "title", "area_id", "area_name", "hazard", "state", "stage", "policy_version_id", "version")},
         "policy": {"version_hash": case["policy_version_id"], "raw": policy()["raw"]},
         "assessment": case["assessment"], "evidence": case["evidence"], "tasks": case["tasks"], "task_history": task_history,
@@ -110,9 +110,9 @@ def _portable_packet_pdf(manifest: dict[str, Any]) -> bytes:
     width, height = A4
     margin = 42
     y = height - margin
-    document.setTitle(f"Linda Protocol decision packet {manifest['case']['id']}")
+    document.setTitle(f"Linda Node decision packet {manifest['case']['id']}")
     document.setFont("Helvetica-Bold", 15)
-    document.drawString(margin, y, "Linda Protocol — Decision Packet")
+    document.drawString(margin, y, "Linda Node — Decision Packet")
     y -= 26
     document.setFont("Helvetica", 8.5)
     for line in json.dumps(manifest, indent=2, ensure_ascii=False).splitlines():
@@ -156,7 +156,7 @@ def cap_xml(case: dict[str, Any], cancel: bool = False) -> bytes:
     stage = case.get("stage") or "ready"
     mapping = {"go": ("Immediate", "Severe", "Likely"), "set": ("Expected", "Moderate", "Likely"), "ready": ("Future", "Minor", "Possible")}
     urgency, severity, certainty = mapping.get(stage, mapping["ready"])
-    for key, value in {"language": "en", "category": "Met", "event": case["hazard"].title(), "urgency": urgency, "severity": severity, "certainty": certainty, "effective": cap_time, "onset": cap_time, "senderName": "Linda Protocol demo", "headline": f"Exercise: {case['hazard'].title()} readiness for {case['area_name']}", "description": f"Linda Protocol exercise activation for {case['area_name']}.", "instruction": "Human-reviewed readiness recommendation only. Linda Protocol does not send public alerts or move funds."}.items(): ET.SubElement(info, tag(key)).text = value
+    for key, value in {"language": "en", "category": "Met", "event": case["hazard"].title(), "urgency": urgency, "severity": severity, "certainty": certainty, "effective": cap_time, "onset": cap_time, "senderName": "Linda Node", "headline": f"Exercise: {case['hazard'].title()} readiness for {case['area_name']}", "description": f"Linda Node exercise activation for {case['area_name']}.", "instruction": "Human-reviewed readiness recommendation only. Linda Node does not send public alerts or move funds."}.items(): ET.SubElement(info, tag(key)).text = value
     area = ET.SubElement(info, tag("area")); ET.SubElement(area, tag("areaDesc")).text = case["area_name"]
     geocode = ET.SubElement(area, tag("geocode")); ET.SubElement(geocode, tag("valueName")).text = "GADM"; ET.SubElement(geocode, tag("value")).text = case["area_id"]
     return ET.tostring(alert, encoding="utf-8", xml_declaration=True)
@@ -188,7 +188,7 @@ def husika_payload(case: dict[str, Any], message: str | None = None, language: s
     urgency = {"go": "immediate", "set": "expected", "ready": "future"}.get(stage, "future")
     payload = {
         "mode": "exercise",
-        "disclaimer": "Ready for dispatch by an authorised Husika operator — Linda Protocol does not send.",
+        "disclaimer": "Ready for dispatch by an authorised Husika operator — Linda Node does not send.",
         "openapi_snapshot": contract,
         "requests": {
             "threat": {"org_public_id": "", "title": case["title"], "summary": document[:280], "description": document, "event_type": case["hazard"], "urgency": urgency, "certainty": "likely", "severity": severity, "threat_level": threat_level, "content_status": "draft", "issue_time": now(), "effective_time": now(), "affected_area_description": f"{case['area_name']} ({case['area_id']})"},
@@ -238,7 +238,7 @@ def exported_payload(conn: Any, export_id: str) -> tuple[dict[str, Any], bytes]:
 
 def published_cap_feed(conn: Any) -> bytes:
     atom = "http://www.w3.org/2005/Atom"; ET.register_namespace("", atom)
-    feed = ET.Element(f"{{{atom}}}feed"); ET.SubElement(feed, f"{{{atom}}}title").text = "Linda Protocol Exercise CAP Feed"; ET.SubElement(feed, f"{{{atom}}}updated").text = now()
+    feed = ET.Element(f"{{{atom}}}feed"); ET.SubElement(feed, f"{{{atom}}}title").text = "Linda Node Exercise CAP Feed"; ET.SubElement(feed, f"{{{atom}}}updated").text = now()
     for row in conn.execute("SELECT * FROM decision_cases WHERE state IN ('APPROVED','HANDED_OFF','REVOKED') ORDER BY updated_at DESC"):
         case = get_case(conn, row["id"]); entry = ET.SubElement(feed, f"{{{atom}}}entry"); ET.SubElement(entry, f"{{{atom}}}id").text = case["id"]; ET.SubElement(entry, f"{{{atom}}}title").text = case["title"]; ET.SubElement(entry, f"{{{atom}}}updated").text = case["updated_at"]; content = ET.SubElement(entry, f"{{{atom}}}content", {"type": "application/xml"}); content.text = cap_xml(case, case["state"] == "REVOKED").decode()
     return ET.tostring(feed, encoding="utf-8", xml_declaration=True)

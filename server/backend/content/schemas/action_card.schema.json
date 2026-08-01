@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Linda Protocol action card",
+  "title": "Linda Node action card",
   "type": "object",
   "required": [
     "id", "hazard", "title", "description", "owner_role", "lead_time_days",

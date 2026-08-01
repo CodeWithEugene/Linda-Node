@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Linda Protocol Blocker Structurer v1",
+  "title": "Linda Node Blocker Structurer v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["code", "severity", "summary", "needs_human_review"],

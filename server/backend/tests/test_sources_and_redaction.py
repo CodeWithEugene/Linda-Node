@@ -295,3 +295,28 @@ def test_upstream_failure_falls_back_to_the_last_snapshot_marked_stale(monkeypat
         snapshot = refresh_adapter(conn, "triggers", force=True)
     assert snapshot["freshness"] == "stale"
     assert "upstream down" in snapshot["meta"]["last_error"]
+
+
+def test_recorded_replay_fixtures_are_not_labelled_synthetic() -> None:
+    """Every replay fixture is a verbatim ICPAC recording; only an escalation
+    step is team-authored, and mislabelling one raised a false warning banner."""
+    reset_demo()
+    with transaction() as conn:
+        sources.set_source_mode(conn, "replay_only")
+        sources.set_replay_step(conn, 0)
+        snapshots = sources.refresh_all(conn, force=True)
+    assert {item["adapter"] for item in snapshots} == {"triggers", "forecasts", "areas", "indicators", "pipeline"}
+    for snapshot in snapshots:
+        assert snapshot["meta"].get("synthetic") is False, f"{snapshot['adapter']} is mislabelled synthetic"
+
+
+def test_only_an_escalation_step_marks_a_snapshot_synthetic() -> None:
+    reset_demo()
+    with transaction() as conn:
+        sources.set_source_mode(conn, "replay_only")
+        sources.set_replay_step(conn, 2)
+        snapshots = {item["adapter"]: item for item in sources.refresh_all(conn, force=True)}
+    assert snapshots["forecasts"]["meta"]["synthetic"] is True
+    assert snapshots["forecasts"]["meta"]["escalation_step"] == 2
+    for adapter in ("triggers", "areas", "indicators", "pipeline"):
+        assert snapshots[adapter]["meta"]["synthetic"] is False
