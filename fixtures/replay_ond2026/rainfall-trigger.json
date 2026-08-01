@@ -1,0 +1,6 @@
+{
+  "source": "fixture://replay_ond2026/rainfall-trigger.json",
+  "hazard": "drought",
+  "area_id": "KEN.3_1",
+  "compound_signal": "seasonal forecast overlaps rainfall trigger"
+}

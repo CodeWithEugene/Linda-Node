@@ -1,0 +1,6 @@
+{
+  "source": "https://eatriggersthresholds.icpac.net/api/triggers/",
+  "rule": "Bungoma Triggers",
+  "action_types": ["email_alert", "dashboard_update"],
+  "masked_author": "c*****@icpac.net"
+}
