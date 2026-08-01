@@ -7,11 +7,32 @@
 
 # Local data samples
 data/
+var/
 
 # Dependencies & build output
+.venv/
 node_modules/
 __pycache__/
 *.pyc
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
 .next/
 dist/
+.vite/
+playwright-report/
+test-results/
+*.db-shm
+*.db-wal
+*.db-journal
+*.log
+*.pid
+.DS_Store
+Thumbs.db
 .gstack/
+*.ini
+*.mako
