@@ -130,7 +130,7 @@ That last row is the whole architecture in one line. ICPAC's rule for Bungoma is
                                 ▲
                     ┌───────────┴───────────┐
                     │ 3 CONSTRAINED ASSISTS │  read-only, schema-forced,
-                    │ Gemini 2.5 Flash      │  cannot change any state
+                    │ NVIDIA NIM             │  cannot change any state
                     └───────────────────────┘
 ```
 
@@ -143,7 +143,7 @@ That last row is the whole architecture in one line. ICPAC's rule for Bungoma is
 | Frontend | React 18 · TypeScript 5 · Vite 5 · Material UI v6 · TanStack Query v5 |
 | Maps | MapLibre GL over ICPAC pg_tileserv vector tiles; Leaflet + OSM for per-case context |
 | Exports | WeasyPrint (ReportLab fallback) · lxml + OASIS CAP 1.2 XSD · jsonschema |
-| AI | `google-genai`, `gemini-2.5-flash`, structured output only — optional and fully degradable |
+| AI | NVIDIA NIM chat completions, structured output validated locally — optional and fully degradable |
 | Tests | pytest · Vitest · React Testing Library |
 
 ---
@@ -283,7 +283,7 @@ Linda-Node/
 │   │   ├── services.py           case service, guards, signing, audit chain
 │   │   ├── exports.py            packet · CAP · Husika · offline bundle
 │   │   ├── integration.py        partner API, keys, signed webhooks
-│   │   └── assists.py            three constrained Gemini assists
+│   │   └── assists.py            three constrained NVIDIA NIM assists
 │   ├── content/
 │   │   ├── policies/{drought,heat,flood}.yaml
 │   │   ├── actions/*.yaml        six action cards
@@ -376,8 +376,9 @@ Copy [`server/backend/.env.example`](server/backend/.env.example) to `server/bac
 | `ICPAC_BASE` | `https://eatriggersthresholds.icpac.net` | Upstream base URL |
 | `HTTP_TIMEOUT_S` | `8` | Per-request upstream timeout |
 | `SNAPSHOT_TTL_MIN` | `30` | Cache lifetime before an adapter refetches |
-| `GEMINI_API_KEY` | — | Optional. Absent ⇒ assist buttons disabled, workflow unaffected |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Assist model |
+| `NVIDIA_API_KEY` | — | Optional server-only NVIDIA API Catalog key. Absent ⇒ assist buttons disabled, workflow unaffected |
+| `NVIDIA_MODEL` | `meta/llama-3.1-70b-instruct` | NVIDIA NIM model used by the constrained assists |
+| `NVIDIA_BASE_URL` | `https://integrate.api.nvidia.com/v1` | NVIDIA API Catalog base URL; point to a compatible self-hosted NIM only when intended |
 | `CORS_ORIGINS` | localhost | Comma-separated browser origins allowed to use cookie sessions |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Used for CAP feed URLs |
@@ -458,7 +459,7 @@ Built on public work by others, with thanks:
 - **IGAD Regional Roadmap for Anticipatory Action**, the **Kenya Anticipatory Action Roadmap**, and the **Kenya Disaster Risk Management Act** — the policy framing this project serves.
 - **IFRC** Early Action Protocol practice — the two-tranche budget pattern the action cards follow.
 - Open source: FastAPI, Pydantic, httpx, jsonschema, lxml, WeasyPrint, ReportLab, React, Material UI, TanStack Query, MapLibre GL, Leaflet, Vite, pytest, Vitest, Ruff.
-- **Google Gemini** — the three constrained, optional assists.
+- **NVIDIA NIM** — the three constrained, optional assists.
 
 ---
 

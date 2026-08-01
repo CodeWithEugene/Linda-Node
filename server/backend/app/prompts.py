@@ -1,4 +1,4 @@
-"""Versioned, narrow system prompts and response schemas for Gemini assists."""
+"""Versioned, narrow system prompts and response schemas for NVIDIA NIM assists."""
 
 from __future__ import annotations
 

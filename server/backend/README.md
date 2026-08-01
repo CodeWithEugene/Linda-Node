@@ -66,7 +66,7 @@ WeasyPrint needs native Pango and Cairo to render PDF packets. The Docker image 
 | `app/exports.py` | Packet (PDF + manifest), CAP 1.2, Husika payload, air-gapped bundle |
 | `app/husika_contract.py` | Vendored Husika OpenAPI spec and local validation |
 | `app/integration.py` | Partner API records, API keys, rate limiting, signed webhooks with SSRF guards |
-| `app/assists.py` | Three constrained Gemini assists with schema enforcement and hard failure paths |
+| `app/assists.py` | Three constrained NVIDIA NIM assists with schema enforcement and hard failure paths |
 | `app/auth.py` | Cookie session (compact HS256), role dependencies, login rate limiting |
 | `app/blob_store.py` | Export storage — local filesystem or private Vercel Blob |
 | `app/demo_seed.py` | The three seeded cases, built through the same normalisers as live data |
@@ -171,7 +171,7 @@ This is integrity protection and non-repudiation *within this system*, using ser
 
 ## Constrained AI assists
 
-Three assists, all optional. With `GEMINI_API_KEY` unset the buttons render disabled and the entire workflow remains completable.
+Three assists, all optional. With `NVIDIA_API_KEY` unset the buttons render disabled and the entire workflow remains completable. The server sends OpenAI-compatible chat-completion requests to NVIDIA NIM, then validates every response against the local JSON Schema before using it.
 
 | Assist | Output schema | Hard constraint |
 |---|---|---|
@@ -247,7 +247,7 @@ Every persona uses the password `linda-demo`: `amina.ews@demo`, `david.drm@demo`
 |---|---|
 | Upstream timeout, 5xx, or schema drift | Serve the last snapshot as `stale` with a visible badge; replay fallback only in `DEMO_MODE`, always labelled |
 | No live signal crosses a threshold | Report "no activation recommended" — never fabricate |
-| Gemini down or returning invalid JSON | Assist marked unavailable, `ASSIST_FAILED` recorded, zero workflow impact |
+| NVIDIA NIM down or returning invalid JSON | Assist marked unavailable, `ASSIST_FAILED` recorded, zero workflow impact |
 | Concurrent edits | Optimistic version check → 409 plus a `CONFLICT_REJECTED` event |
 | Guard violation via a direct API call | 422 naming the failed guard |
 | Export regeneration | New immutable file; prior exports stay downloadable |

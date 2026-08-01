@@ -72,5 +72,5 @@ Please allow a reasonable remediation window before publishing details. Good-fai
 
 - Vulnerabilities requiring physical access to an unlocked device.
 - Volumetric denial-of-service attacks.
-- Defects in third-party platforms — including ICPAC source systems, Husika services, Google Gemini, Vercel, or GitHub. Report those to the relevant provider unless Linda Node is directly at fault.
+- Defects in third-party platforms — including ICPAC source systems, Husika services, NVIDIA NIM, Vercel, or GitHub. Report those to the relevant provider unless Linda Node is directly at fault.
 - The documented absence of self-registration, password reset, and OAuth. Users are seeded by design.

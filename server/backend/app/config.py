@@ -6,6 +6,14 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Local development may use either the repository .env or server/backend/.env.
+# Real environment variables (including Vercel's) always take precedence.
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(PROJECT_ROOT / ".env", override=False)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -14,8 +22,9 @@ class Settings:
     database_path: Path | None
     database_engine: str
     demo_mode: bool
-    gemini_api_key: str | None
-    gemini_model: str
+    nvidia_api_key: str | None
+    nvidia_model: str
+    nvidia_base_url: str
     cors_origins: list[str]
     public_base_url: str
     cookie_secure: bool
@@ -42,8 +51,9 @@ def get_settings() -> Settings:
         database_path=database_path,
         database_engine="sqlite" if database_path else "postgres",
         demo_mode=os.getenv("DEMO_MODE", "true").lower() == "true",
-        gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        nvidia_api_key=os.getenv("NVIDIA_API_KEY") or None,
+        nvidia_model=os.getenv("NVIDIA_MODEL", "meta/llama-3.1-70b-instruct"),
+        nvidia_base_url=os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").rstrip("/"),
         cors_origins=[
             origin.strip()
             for origin in os.getenv(

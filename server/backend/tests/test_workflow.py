@@ -174,9 +174,44 @@ async def test_matcher_rejects_an_invented_card_id(monkeypatch: pytest.MonkeyPat
     async def bad_matcher(_: str, __: dict) -> dict:
         return {"candidates": [{"card_id": "invented_card", "rationale": "no", "rank": 1}]}
 
-    monkeypatch.setattr(assists, "_gemini", bad_matcher)
+    monkeypatch.setattr(assists, "_nvidia", bad_matcher)
     with pytest.raises(assists.AssistUnavailable, match="card-id validation"):
         await assists.run_matcher(case)
+
+
+@pytest.mark.asyncio
+async def test_nvidia_assist_uses_server_side_bearer_auth_and_validates_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict] = []
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"choices": [{"message": {"content": '{"code":"OTHER","severity":"normal","summary":"Needs review","needs_human_review":true,"classification":"not part of the contract"}'}}]}
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+        async def post(self, url: str, **kwargs: object) -> FakeResponse:
+            calls.append({"url": url, **kwargs})
+            return FakeResponse()
+
+    monkeypatch.setattr(assists, "settings", replace(assists.settings, nvidia_api_key="test-key", nvidia_model="test-model", nvidia_base_url="https://nim.example/v1"))
+    monkeypatch.setattr(assists.httpx, "AsyncClient", lambda **_: FakeClient())
+
+    result = await assists._nvidia("blockers", {"field_report": "Road access is uncertain", "taxonomy": ["OTHER"]})
+
+    assert result["code"] == "OTHER"
+    assert "classification" not in result
+    assert calls[0]["url"] == "https://nim.example/v1/chat/completions"
+    assert calls[0]["headers"] == {"Authorization": "Bearer test-key"}
+    assert calls[0]["json"]["model"] == "test-model"
+    assert '"needs_human_review"' in calls[0]["json"]["messages"][0]["content"]
 
 
 def test_replay_sources_can_assess_a_new_case() -> None:

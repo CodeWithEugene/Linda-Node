@@ -35,6 +35,8 @@
 
 *(Click the accessibility icon, enable **Larger text** briefly, then switch it back off before the rest of the demo.)*
 
+> "Inside a decision case, three optional NVIDIA NIM assists can explain already-recorded evidence, re-rank only policy-eligible actions, or suggest a blocker code. Every answer is schema-validated and advisory: it cannot change an assessment, approval, task, or decision."
+
 ---
 
 ## 0:00 – 0:35 · The gap

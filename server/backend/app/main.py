@@ -329,7 +329,7 @@ def event_verification(case_id: str, _: dict[str, Any] = Depends(current_user)) 
 
 @app.post("/api/cases/{case_id}/assists/{assist_name}")
 def assist(case_id: str, assist_name: str, payload: AssistInput, user: dict[str, Any] = Depends(require_role("ews_specialist", "county_drm_officer", "ngo_finance_lead"))) -> dict[str, Any]:
-    # Do not hold a SQLite write transaction while waiting for Gemini. The
+    # Do not hold a SQLite write transaction while waiting for NVIDIA NIM. The
     # assist is read-only and its result cannot transition a case.
     with connection() as conn:
         case = get_case(conn, case_id)

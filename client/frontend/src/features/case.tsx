@@ -406,7 +406,7 @@ function EvidenceTab({ caseItem }: { caseItem: DecisionCase }) {
         title="AI evidence explanation"
         subtitle="Reads the trace above; it cannot alter policy, gates, or case state"
         action={
-          <Tooltip title={assists.data?.available ? 'Explain the existing evidence trace' : 'Gemini is not configured — the deterministic workflow is unaffected'}>
+          <Tooltip title={assists.data?.available ? 'Explain the existing evidence trace' : 'NVIDIA NIM is not configured — the deterministic workflow is unaffected'}>
             <span>
               <Button startIcon={<SmartToy />} disabled={!assists.data?.available || explain.isPending || !caseItem.evidence.length} onClick={() => explain.mutate()}>
                 {explain.isPending ? 'Running…' : 'Run explainer'}
@@ -584,7 +584,7 @@ function ActionsTab({ caseItem }: { caseItem: DecisionCase }) {
         title="AI action matcher"
         subtitle="Ranks only cards already eligible under deterministic policy; it cannot add cards or change gates"
         action={
-          <Tooltip title={assists.data?.available ? 'Run the constrained matcher' : 'Gemini is not configured — the deterministic workflow is unaffected'}>
+          <Tooltip title={assists.data?.available ? 'Run the constrained matcher' : 'NVIDIA NIM is not configured — the deterministic workflow is unaffected'}>
             <span>
               <Button startIcon={<PlayArrow />} disabled={!assists.data?.available || matcherMutation.isPending} onClick={() => matcherMutation.mutate()}>
                 {matcherMutation.isPending ? 'Ranking…' : 'Run matcher'}
@@ -709,7 +709,7 @@ function TaskDialog(props: {
                 onChange={(event) => setNote(event.target.value)}
                 helperText="A taxonomy code and an explanatory note are both required."
               />
-              <Tooltip title={assistsEnabled ? 'Suggest a taxonomy code — a human must confirm it' : 'Gemini is not configured'}>
+              <Tooltip title={assistsEnabled ? 'Suggest a taxonomy code — a human must confirm it' : 'NVIDIA NIM is not configured'}>
                 <span>
                   <Button startIcon={<SmartToy />} disabled={!assistsEnabled || !note || classify.isPending} onClick={() => classify.mutate()}>
                     Suggest classification
