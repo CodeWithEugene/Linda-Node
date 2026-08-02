@@ -242,7 +242,7 @@ function Shell({ children, preference, setPreference }: { children: ReactNode; p
         <Toolbar>
           <IconButton color="inherit" onClick={() => setOpen(true)} sx={{ display: { md: 'none' } }} aria-label="Open navigation"><MenuIcon /></IconButton>
           <Box component={Link} to="/" aria-label="Linda Node home" sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
-            <Logo plate height={26} />
+            <Logo height={26} />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Tooltip title="Provenance legend">

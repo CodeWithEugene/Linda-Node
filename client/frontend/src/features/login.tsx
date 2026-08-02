@@ -53,7 +53,7 @@ export function LoginPage() {
         <Box sx={{ position: 'absolute', width: 420, height: 420, borderRadius: '50%', bgcolor: 'rgba(255,255,255,.06)', top: -160, right: -155 }} />
         <Stack spacing={4} sx={{ position: 'relative', maxWidth: 600 }}>
           <Box>
-            <Logo plate height={44} sx={{ mb: 3 }} />
+            <Logo height={44} sx={{ mb: 3 }} />
             <Typography component="h1" variant="h2" sx={{ lineHeight: 1.1, mb: 2 }}>A defensible path from early warning to action.</Typography>
             <Typography variant="body1" sx={{ color: 'rgba(255,255,255,.78)', maxWidth: 540 }}>
               Linda turns evidence into reviewable activation decisions, preserving the policy trace, the role approvals, and every handoff.
